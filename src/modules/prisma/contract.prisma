@@ -1,0 +1,21 @@
+model Bucket {
+  name      String   @id
+  createdAt DateTime @default(now()) @map("created_at")
+
+  objects Object[]
+
+  @@map("buckets")
+}
+
+model Object {
+  id          String   @id
+  key         String
+  bucketName  String   @map("bucket_name")
+  bucket      Bucket   @relation(references: [name], fields: [bucketName], onDelete: Restrict, onUpdate: Restrict)
+  size        Int
+  contentType String   @map("content_type")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([bucketName, key])
+  @@map("objects")
+}

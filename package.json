@@ -1,0 +1,21 @@
+{
+  "name": "buns3",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot ./src",
+    "prisma:studio": "cd .. && bunx prisma@7 studio --url \"file://$SQLITE_PATH\""
+  },
+  "devDependencies": {
+    "@prisma/cli-engine": "^0.3.0",
+    "@types/bun": "latest",
+    "dotenv": "^17.4.2"
+  },
+  "peerDependencies": {
+    "typescript": "^7"
+  },
+  "dependencies": {
+    "@prisma/orm-sqlite": "^8.0.0-rc.8"
+  }
+}

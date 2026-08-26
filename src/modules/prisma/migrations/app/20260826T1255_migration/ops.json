@@ -1,0 +1,125 @@
+[
+  {
+    "id": "table.buckets",
+    "label": "Create table buckets",
+    "summary": "Creates table buckets with required columns",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "table",
+        "name": "buckets"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"buckets\" does not exist",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "buckets"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"buckets\"",
+        "sql": "CREATE TABLE \"buckets\" (\n  \"created_at\" TEXT NOT NULL DEFAULT (datetime('now')),\n  \"name\" TEXT NOT NULL,\n  PRIMARY KEY (\"name\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"buckets\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "buckets"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.objects",
+    "label": "Create table objects",
+    "summary": "Creates table objects with required columns",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "table",
+        "name": "objects"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"objects\" does not exist",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "objects"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"objects\"",
+        "sql": "CREATE TABLE \"objects\" (\n  \"bucket_name\" TEXT NOT NULL,\n  \"content_type\" TEXT NOT NULL,\n  \"created_at\" TEXT NOT NULL DEFAULT (datetime('now')),\n  \"id\" TEXT NOT NULL,\n  \"key\" TEXT NOT NULL,\n  \"size\" INTEGER NOT NULL,\n  PRIMARY KEY (\"id\"),\n  UNIQUE (\"bucket_name\", \"key\"),\n  FOREIGN KEY (\"bucket_name\") REFERENCES \"buckets\" (\"name\") ON DELETE RESTRICT ON UPDATE RESTRICT\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"objects\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "objects"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.objects.objects_bucket_name_idx_a0195dbd",
+    "label": "Create index objects_bucket_name_idx_a0195dbd on objects",
+    "summary": "Creates index objects_bucket_name_idx_a0195dbd on objects",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "index",
+        "name": "objects_bucket_name_idx_a0195dbd",
+        "table": "objects"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"objects_bucket_name_idx_a0195dbd\" is missing",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "index",
+          "objects_bucket_name_idx_a0195dbd"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"objects_bucket_name_idx_a0195dbd\"",
+        "sql": "CREATE INDEX \"objects_bucket_name_idx_a0195dbd\" ON \"objects\" (\"bucket_name\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"objects_bucket_name_idx_a0195dbd\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "index",
+          "objects_bucket_name_idx_a0195dbd"
+        ]
+      }
+    ]
+  }
+]
