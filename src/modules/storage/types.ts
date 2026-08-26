@@ -3,23 +3,13 @@ import type { Buns3ErrorCode } from "./errors";
 import type { Contract } from "../prisma/contract";
 
 export type Bucket = DefaultModelRow<Contract, "Bucket">;
-export type Object = DefaultModelRow<Contract, "Object">;
-
-export type Buns3Result = Promise<
-  | {
-      success: true;
-    }
-  | {
-      success: false;
-      code: Buns3ErrorCode;
-    }
->;
+export type StorageObject = DefaultModelRow<Contract, "Object">;
 
 export type Buns3FileResult<TFile> = Promise<
   | {
       success: true;
       file: TFile;
-      object: Object;
+      object: StorageObject;
     }
   | {
       success: false;
@@ -50,9 +40,9 @@ export interface Buns3Storage {
     contentType: string,
   ): Buns3FileResult<Bun.FileBlob>;
 
-  delete(bucket: string, key: string): Buns3Result;
+  delete(bucket: string, key: string): Buns3FileResult<null>;
 
-  head(bucket: string, key: string): Buns3FileResult<Bun.FileBlob>;
+  head(bucket: string, key: string): Buns3FileResult<null>;
 }
 
 export interface Buns3BucketStorage {

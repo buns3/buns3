@@ -132,10 +132,45 @@ export const fileStorage: Buns3Storage = {
   },
 
   async delete(bucket, key) {
-    return { success: false, code: "UNKNOWN" };
+    const deleted = await db.orm.Object.where({
+      bucketName: bucket,
+      key,
+    }).delete();
+
+    if (!deleted) {
+      return {
+        success: false,
+        code: "KEY_NOT_FOUND",
+      };
+    }
+
+    try {
+      const file = resolve(bucket, deleted.id);
+      await file.unlink();
+    } catch (err) {
+      console.error("orphaned blob", bucket, deleted.id, err);
+    }
+
+    return { success: true, file: null, object: deleted };
   },
 
   async head(bucket, key) {
-    return { success: false, code: "UNKNOWN" };
+    const existingObject = await db.orm.Object.where({
+      bucketName: bucket,
+      key,
+    }).first();
+
+    if (!existingObject) {
+      return {
+        success: false,
+        code: "KEY_NOT_FOUND",
+      };
+    }
+
+    return {
+      success: true,
+      file: null,
+      object: existingObject,
+    };
   },
 };

@@ -1,4 +1,5 @@
 import { withMiddleware } from "$/lib/middleware";
+import { objectHeaders } from "$/lib/request";
 import { fileStorage } from "../storage/file-storage";
 import { errorResponse } from "./errors";
 import { bucketKeyMiddleware } from "./middleware";
@@ -18,23 +19,7 @@ export async function initServer(): Promise<AppServer> {
             return errorResponse(fileResult.code);
           }
 
-          const keyParts = fileResult.object.key.split("/");
-          const filename = encodeURIComponent(keyParts.at(-1)!)
-            .replaceAll("'", "%27")
-            .replaceAll("(", "%28")
-            .replaceAll(")", "%29")
-            .replaceAll("*", "%2A");
-
-          const headers = new Headers();
-          headers.set("Content-Type", fileResult.object.contentType);
-          headers.set(
-            "Last-Modified",
-            fileResult.object.createdAt.toUTCString(),
-          );
-          headers.set(
-            "Content-Disposition",
-            `inline; filename*=UTF-8''${filename}`,
-          );
+          const headers = objectHeaders(fileResult.object);
           return new Response(fileResult.file, { headers });
         }),
 
@@ -57,13 +42,31 @@ export async function initServer(): Promise<AppServer> {
           return Response.json({ ...ctx });
         }),
 
-        DELETE: withMiddleware([bucketKeyMiddleware], (req, ctx, server) => {
-          return Response.json({ ...ctx });
-        }),
+        DELETE: withMiddleware(
+          [bucketKeyMiddleware],
+          async (req, ctx, server) => {
+            const fileResult = await fileStorage.delete(ctx.bucket, ctx.key);
+            if (!fileResult.success) {
+              return errorResponse(fileResult.code);
+            }
 
-        HEAD: withMiddleware([bucketKeyMiddleware], (req, ctx, server) => {
-          return Response.json({ ...ctx });
-        }),
+            return new Response(null, { status: 204 });
+          },
+        ),
+
+        HEAD: withMiddleware(
+          [bucketKeyMiddleware],
+          async (req, ctx, server) => {
+            const fileResult = await fileStorage.get(ctx.bucket, ctx.key);
+            if (!fileResult.success) {
+              const errResponse = errorResponse(fileResult.code);
+              return new Response(null, { status: errResponse.status });
+            }
+
+            const headers = objectHeaders(fileResult.object);
+            return new Response(null, { headers });
+          },
+        ),
       },
     },
 
