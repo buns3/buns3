@@ -3,7 +3,9 @@ import type { Buns3BucketStorage } from "./types";
 import { BASE_PATH } from "./constants";
 import { db } from "../prisma/db";
 import { mkdir } from "node:fs/promises";
-import { isErrnoException } from "./errors";
+import { isErrnoException, isFkViolation, isUniqueViolation } from "./errors";
+import { unlink } from "node:fs/promises";
+import { rmdir } from "node:fs/promises";
 
 function resolve(bucket: string) {
   return path.resolve(BASE_PATH, bucket);
@@ -40,41 +42,116 @@ export const bucketStorage: Buns3BucketStorage = {
       };
     }
 
-    const bucketPath = resolve(bucket);
-    const newBucket = await db.transaction(async (tx) => {
-      const created = await tx.orm.Bucket.create({ name: bucket });
+    try {
+      const bucketPath = resolve(bucket);
+      const newBucket = await db.transaction(async (tx) => {
+        const created = await tx.orm.Bucket.create({ name: bucket });
 
-      try {
-        await mkdir(bucketPath);
-      } catch (err) {
-        if (isErrnoException(err) && err.code === "EEXIST") {
-          // TODO : bucket folder exists - throw error or ignore and mend FS <-> DB bond?
-        } else {
-          console.error(err);
-          throw err;
-        }
+        await mkdir(bucketPath, { recursive: true });
+        return created;
+      });
+
+      return {
+        success: true,
+        bucket: newBucket,
+      };
+    } catch (err) {
+      if (isUniqueViolation(err, "buckets.name")) {
+        return {
+          success: false,
+          code: "BUCKET_ALREADY_EXIST",
+        };
       }
 
-      return created;
-    });
-
-    return {
-      success: true,
-      bucket: newBucket,
-    };
+      console.error(err);
+      return {
+        success: false,
+        code: "UNKNOWN",
+      };
+    }
   },
 
   async delete(bucket) {
+    const existingBucket = await db.orm.Bucket.include("objects", (object) =>
+      object.count(),
+    ).first({
+      name: bucket,
+    });
+
+    if (!existingBucket) {
+      return {
+        success: false,
+        code: "BUCKET_NOT_FOUND",
+      };
+    }
+
+    if (existingBucket.objects) {
+      return {
+        success: false,
+        code: "BUCKET_NOT_EMPTY",
+      };
+    }
+
+    const bucketPath = resolve(bucket);
+    let deleted;
+    try {
+      deleted = await db.orm.Bucket.where({ name: bucket }).delete();
+      if (!deleted) {
+        return {
+          success: false,
+          code: "BUCKET_NOT_FOUND",
+        };
+      }
+    } catch (err) {
+      if (isFkViolation(err)) {
+        return {
+          success: false,
+          code: "BUCKET_NOT_EMPTY",
+        };
+      }
+
+      console.error(err);
+      return {
+        success: false,
+        code: "UNKNOWN",
+      };
+    }
+
+    try {
+      await rmdir(bucketPath);
+    } catch (err) {
+      console.error("orphaned bucket", bucket, err);
+    }
+
     return {
-      success: false,
-      code: "UNKNOWN",
+      success: true,
+      bucket: deleted,
     };
   },
 
   async head(bucket) {
+    const existingBucket = await db.orm.Bucket.first({
+      name: bucket,
+    });
+
+    if (!existingBucket) {
+      return {
+        success: false,
+        code: "BUCKET_NOT_FOUND",
+      };
+    }
+
     return {
-      success: false,
-      code: "UNKNOWN",
+      success: true,
+      bucket: existingBucket,
+    };
+  },
+
+  async list() {
+    const buckets = await db.orm.Bucket.all();
+    return {
+      success: true,
+      buckets,
     };
   },
 };

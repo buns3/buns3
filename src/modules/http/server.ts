@@ -1,9 +1,10 @@
 import { withMiddleware } from "$/lib/middleware";
-import { objectHeaders } from "$/lib/request";
+import { objectHeaders, uriEncodedKey } from "$/lib/request";
 import { fileStorage } from "../storage/file-storage";
 import { errorResponse } from "./errors";
-import { bucketKeyMiddleware } from "./middleware";
+import { bucketKeyMiddleware, bucketMiddleware } from "./middleware";
 import type { AppServer } from "./types";
+import { bucketStorage } from "../storage/bucket";
 
 export async function initServer(): Promise<AppServer> {
   const server = Bun.serve({
@@ -39,7 +40,15 @@ export async function initServer(): Promise<AppServer> {
             return errorResponse(fileResult.code);
           }
 
-          return Response.json({ ...ctx });
+          const headers = new Headers();
+          headers.set(
+            "Location",
+            `/${fileResult.object.bucketName}/${uriEncodedKey(fileResult.object.key)}`,
+          );
+          return Response.json(
+            { bucket: ctx.bucket, key: ctx.key },
+            { status: 201, headers },
+          );
         }),
 
         DELETE: withMiddleware(
@@ -67,6 +76,65 @@ export async function initServer(): Promise<AppServer> {
             return new Response(null, { headers });
           },
         ),
+      },
+
+      "/_admin/buckets": {
+        GET: async () => {
+          const bucketsResult = await bucketStorage.list();
+          if (!bucketsResult.success) {
+            return errorResponse(bucketsResult.code);
+          }
+
+          return Response.json({ buckets: bucketsResult.buckets });
+        },
+
+        HEAD: () => {
+          return new Response(null);
+        },
+      },
+
+      "/_admin/buckets/:name": {
+        GET: withMiddleware([bucketMiddleware], async (req, ctx, server) => {
+          const result = await bucketStorage.get(ctx.name);
+          if (!result.success) {
+            return errorResponse(result.code);
+          }
+
+          return Response.json({ bucket: result.bucket });
+        }),
+
+        PUT: withMiddleware([bucketMiddleware], async (req, ctx, server) => {
+          const result = await bucketStorage.create(ctx.name);
+          if (!result.success) {
+            return errorResponse(result.code);
+          }
+
+          const headers = new Headers();
+          headers.set("Location", `/${ctx.name}`);
+          return Response.json(
+            { bucket: result.bucket },
+            { status: 201, headers },
+          );
+        }),
+
+        DELETE: withMiddleware([bucketMiddleware], async (req, ctx, server) => {
+          const result = await bucketStorage.delete(ctx.name);
+          if (!result.success) {
+            return errorResponse(result.code);
+          }
+
+          return new Response(null, { status: 204 });
+        }),
+
+        HEAD: withMiddleware([bucketMiddleware], async (req, ctx, server) => {
+          const result = await bucketStorage.head(ctx.name);
+          if (!result.success) {
+            const valResponse = errorResponse(result.code);
+            return new Response(null, { status: valResponse.status });
+          }
+
+          return new Response(null);
+        }),
       },
     },
 

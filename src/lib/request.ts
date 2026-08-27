@@ -1,12 +1,20 @@
 import { type StorageObject } from "$/modules/storage/types";
 import { keyToFilename } from "./key";
 
-export function uriEncodedFilename(filename: string) {
-  return encodeURIComponent(filename)
+export function strictEncode(value: string) {
+  return encodeURIComponent(value)
     .replaceAll("'", "%27")
     .replaceAll("(", "%28")
     .replaceAll(")", "%29")
     .replaceAll("*", "%2A");
+}
+
+export function uriEncodedFilename(filename: string) {
+  return strictEncode(filename);
+}
+
+export function uriEncodedKey(key: string) {
+  return key.split("/").map(strictEncode).join("/");
 }
 
 export function objectHeaders(object: StorageObject) {

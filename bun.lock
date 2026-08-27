@@ -6,6 +6,7 @@
       "name": "buns3",
       "dependencies": {
         "@prisma/orm-sqlite": "^8.0.0-rc.8",
+        "arktype": "^2.2.3",
       },
       "devDependencies": {
         "@prisma/cli-engine": "^0.3.0",

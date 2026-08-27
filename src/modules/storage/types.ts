@@ -28,6 +28,17 @@ export type Buns3BucketResult = Promise<
     }
 >;
 
+export type Buns3BucketListResult = Promise<
+  | {
+      success: true;
+      buckets: Bucket[];
+    }
+  | {
+      success: false;
+      code: Buns3ErrorCode;
+    }
+>;
+
 export interface Buns3Storage {
   init(): Promise<void>;
 
@@ -53,4 +64,6 @@ export interface Buns3BucketStorage {
   delete(bucket: string): Buns3BucketResult;
 
   head(bucket: string): Buns3BucketResult;
+
+  list(): Buns3BucketListResult;
 }
