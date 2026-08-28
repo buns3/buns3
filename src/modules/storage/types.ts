@@ -1,5 +1,5 @@
 import type { DefaultModelRow } from "@prisma/orm-sqlite/orm-client";
-import type { Buns3ErrorCode } from "./errors";
+import type { Buns3ErrorCode } from "$/lib/error-codes";
 import type { Contract } from "../prisma/contract";
 
 export type Bucket = DefaultModelRow<Contract, "Bucket">;

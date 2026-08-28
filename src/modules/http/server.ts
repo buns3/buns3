@@ -1,197 +1,144 @@
-import { withMiddleware } from "$/lib/middleware";
-import { objectHeaders, uriEncodedKey } from "$/lib/request";
-import { fileStorage } from "../storage/file-storage";
-import { errorResponse, validationErrorResponse } from "./errors";
-import {
-  bucketKeyMiddleware,
-  bucketMiddleware,
-  requireAuth,
-} from "./middleware";
-import type { AppServer } from "./types";
-import { bucketStorage } from "../storage/bucket";
+import Elysia, { InternalServerError, status, t } from "elysia";
+import { fileStorage } from "$/modules/storage/file-storage";
+import { Buns3Error, Buns3ValidationError, unwrap } from "$/lib/error";
+import { useAuth, useBucketKey } from "./middleware";
+import { useErrorHandler } from "./error";
+import { applyObjectHeaders } from "./headers";
+import { uriEncodedKey } from "$/lib/request";
 import { CreateApiKey } from "../validation/api-key";
-import { type } from "arktype";
 import { apiKeyStorage } from "../api-keys/api-key-storage";
+import { type } from "arktype";
+import { bucketStorage } from "../storage/bucket";
+import { BucketName } from "../validation/bucket";
 
-export async function initServer(): Promise<AppServer> {
-  const server = Bun.serve({
-    port: Bun.env.PORT ?? 8000,
-    maxRequestBodySize: 1024 * 1024 * 1024 * 5, // 5GB
-    routes: {
-      "/": Response.json({ message: "OK" }),
-
-      "/:bucket/*": {
-        GET: withMiddleware(
-          [bucketKeyMiddleware, requireAuth("read")],
-          async (req, ctx, server) => {
-            const fileResult = await fileStorage.get(ctx.bucket, ctx.key);
-            if (!fileResult.success) {
-              return errorResponse(fileResult.code);
-            }
-
-            const headers = objectHeaders(fileResult.object);
-            return new Response(fileResult.file, { headers });
+export async function initServer() {
+  const app = new Elysia({
+    serve: { maxRequestBodySize: 5 * 1024 ** 3 },
+  })
+    .use(useErrorHandler)
+    .use(useAuth)
+    // /bucket/key routes
+    .group("/:bucket/*", (group) =>
+      group
+        .use(useBucketKey)
+        .get(
+          "",
+          { auth: "read", bucketKey: true },
+          async ({ set, bucket, key }) => {
+            const { file, object } = unwrap(await fileStorage.get(bucket, key));
+            applyObjectHeaders(set.headers, object);
+            return file;
           },
-        ),
-
-        PUT: withMiddleware(
-          [bucketKeyMiddleware, requireAuth("write")],
-          async (req, ctx, server) => {
-            const stream = req.body;
-            if (!stream) return errorResponse("UNKNOWN");
-
+        )
+        .put(
+          "",
+          {
+            auth: "write",
+            bucketKey: true,
+            parse: "none",
+          },
+          async ({ set, bucket, key, request, headers }) => {
+            const stream = request.body ?? new Blob([]).stream();
             const contentType =
-              req.headers.get("content-type") ?? "application/octet-stream";
-            const fileResult = await fileStorage.put(
-              ctx.bucket,
-              ctx.key,
-              stream,
-              contentType,
-            );
-            if (!fileResult.success) {
-              return errorResponse(fileResult.code);
-            }
+              headers["content-type"] ?? "application/octet-stream";
 
-            const headers = new Headers();
-            headers.set(
-              "Location",
-              `/${fileResult.object.bucketName}/${uriEncodedKey(fileResult.object.key)}`,
+            const { object } = unwrap(
+              await fileStorage.put(bucket, key, stream, contentType),
             );
-            return Response.json(
-              { bucket: ctx.bucket, key: ctx.key },
-              { status: 201, headers },
-            );
+
+            set.headers["location"] =
+              `/${object.bucketName}/${uriEncodedKey(object.key)}`;
+
+            return status(201, {
+              bucket: object.bucketName,
+              key,
+            });
+          },
+        )
+        .delete(
+          "",
+          { auth: "write", bucketKey: true },
+          async ({ bucket, key }) => {
+            unwrap(await fileStorage.delete(bucket, key));
+            return status(204, null);
+          },
+        )
+        .head(
+          "",
+          { auth: "read", bucketKey: true },
+          async ({ set, bucket, key }) => {
+            const { object } = unwrap(await fileStorage.get(bucket, key));
+            applyObjectHeaders(set.headers, object);
+            set.headers["content-length"] = String(object.size);
           },
         ),
+    )
 
-        DELETE: withMiddleware(
-          [bucketKeyMiddleware, requireAuth("write")],
-          async (req, ctx, server) => {
-            const fileResult = await fileStorage.delete(ctx.bucket, ctx.key);
-            if (!fileResult.success) {
-              return errorResponse(fileResult.code);
-            }
+    // whoami route
+    .get("/_admin/whoami", { auth: true }, ({ apiKey }) => {
+      return { apiKey };
+    })
 
-            return new Response(null, { status: 204 });
-          },
-        ),
-
-        HEAD: withMiddleware(
-          [bucketKeyMiddleware, requireAuth("read")],
-          async (req, ctx, server) => {
-            const fileResult = await fileStorage.get(ctx.bucket, ctx.key);
-            if (!fileResult.success) {
-              const errResponse = errorResponse(fileResult.code);
-              return new Response(null, { status: errResponse.status });
-            }
-
-            const headers = objectHeaders(fileResult.object);
-            return new Response(null, { headers });
-          },
-        ),
-      },
-
-      "/_admin/buckets": {
-        GET: withMiddleware([requireAuth("admin")], async () => {
-          const bucketsResult = await bucketStorage.list();
-          if (!bucketsResult.success) {
-            return errorResponse(bucketsResult.code);
+    // rest of admin routes
+    .group("/_admin", { auth: "admin" }, (group) =>
+      group
+        .post("/keys", async ({ body }) => {
+          const input = CreateApiKey(body);
+          if (input instanceof type.errors) {
+            throw new Buns3ValidationError(input);
           }
 
-          return Response.json({ buckets: bucketsResult.buckets });
+          const { data } = unwrap(await apiKeyStorage.create(input));
+          return status(201, data);
+        })
+
+        .get("/buckets", { auth: "admin" }, async () => {
+          const { buckets } = unwrap(await bucketStorage.list());
+          return Response.json({ buckets });
+        })
+        .head("/buckets", { auth: "admin" })
+
+        .get("/buckets/:name", { auth: "admin" }, async ({ params }) => {
+          const name = BucketName(params.name);
+          if (name instanceof type.errors) {
+            throw new Buns3ValidationError(name);
+          }
+
+          const { bucket } = unwrap(await bucketStorage.get(name));
+          return { bucket };
+        })
+        .put("/buckets/:name", { auth: "admin" }, async ({ set, params }) => {
+          const name = BucketName(params.name);
+          if (name instanceof type.errors) {
+            throw new Buns3ValidationError(name);
+          }
+
+          const { bucket } = unwrap(await bucketStorage.create(name));
+
+          set.headers["location"] = `/${name}`;
+          return status(201, { bucket });
+        })
+        .delete("/buckets/:name", { auth: "admin" }, async ({ params }) => {
+          const name = BucketName(params.name);
+          if (name instanceof type.errors) {
+            throw new Buns3ValidationError(name);
+          }
+
+          unwrap(await bucketStorage.delete(name));
+          return status(204, null);
+        })
+        .head("/buckets/:name", { auth: "admin" }, async ({ params }) => {
+          const name = BucketName(params.name);
+          if (name instanceof type.errors) {
+            throw new Buns3ValidationError(name);
+          }
+
+          unwrap(await bucketStorage.head(name));
         }),
+    )
 
-        HEAD: withMiddleware([requireAuth("admin")], () => {
-          return new Response(null);
-        }),
-      },
+    .listen(process.env.PORT ?? 8000);
 
-      "/_admin/whoami": {
-        GET: withMiddleware([requireAuth()], async (req, ctx, server) => {
-          return Response.json({ apiKey: ctx.apiKey });
-        }),
-      },
-
-      "/_admin/keys": {
-        POST: withMiddleware(
-          [requireAuth("admin")],
-          async (req, ctx, server) => {
-            const input = CreateApiKey(await req.json());
-            if (input instanceof type.errors) {
-              return validationErrorResponse(input);
-            }
-
-            const result = await apiKeyStorage.create(input);
-            if (!result.success) {
-              return errorResponse(result.code);
-            }
-
-            return Response.json(result.data);
-          },
-        ),
-      },
-
-      "/_admin/buckets/:name": {
-        GET: withMiddleware(
-          [bucketMiddleware, requireAuth("admin")],
-          async (req, ctx, server) => {
-            const result = await bucketStorage.get(ctx.name);
-            if (!result.success) {
-              return errorResponse(result.code);
-            }
-
-            return Response.json({ bucket: result.bucket });
-          },
-        ),
-
-        PUT: withMiddleware(
-          [bucketMiddleware, requireAuth("admin")],
-          async (req, ctx, server) => {
-            const result = await bucketStorage.create(ctx.name);
-            if (!result.success) {
-              return errorResponse(result.code);
-            }
-
-            const headers = new Headers();
-            headers.set("Location", `/${ctx.name}`);
-            return Response.json(
-              { bucket: result.bucket },
-              { status: 201, headers },
-            );
-          },
-        ),
-
-        DELETE: withMiddleware(
-          [bucketMiddleware, requireAuth("admin")],
-          async (req, ctx, server) => {
-            const result = await bucketStorage.delete(ctx.name);
-            if (!result.success) {
-              return errorResponse(result.code);
-            }
-
-            return new Response(null, { status: 204 });
-          },
-        ),
-
-        HEAD: withMiddleware(
-          [bucketMiddleware, requireAuth("admin")],
-          async (req, ctx, server) => {
-            const result = await bucketStorage.head(ctx.name);
-            if (!result.success) {
-              const valResponse = errorResponse(result.code);
-              return new Response(null, { status: valResponse.status });
-            }
-
-            return new Response(null);
-          },
-        ),
-      },
-    },
-
-    development: Bun.env.NODE_ENV !== "production",
-  });
-
-  console.log("HTTP server started at", server.url.href);
-
-  return server;
+  console.log("HTTP server started at", app.server?.url.href);
+  return app;
 }

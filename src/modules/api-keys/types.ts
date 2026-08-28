@@ -1,5 +1,5 @@
 import type { DefaultModelRow } from "@prisma/orm-sqlite/orm-client";
-import type { Buns3ApiKeyErrorCode } from "./errors";
+import type { Buns3ApiKeyErrorCode } from "$/lib/error-codes";
 import type { Contract } from "../prisma/contract";
 import type { CreateApiKey } from "../validation/api-key";
 
