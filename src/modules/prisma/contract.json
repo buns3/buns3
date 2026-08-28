@@ -4,6 +4,10 @@
   "target": "sqlite",
   "profileHash": "260b8608d1aacaf1f690779a6cff39a12947c599597c5ba464ca75b9e775df53",
   "roots": {
+    "api_keys": {
+      "model": "ApiKey",
+      "namespace": "__unbound__"
+    },
     "buckets": {
       "model": "Bucket",
       "namespace": "__unbound__"
@@ -17,6 +21,133 @@
     "namespaces": {
       "__unbound__": {
         "models": {
+          "ApiKey": {
+            "fields": {
+              "bucketName": {
+                "nullable": true,
+                "type": {
+                  "codecId": "sqlite/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "canRead": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sqlite/integer@1",
+                  "kind": "scalar"
+                }
+              },
+              "canWrite": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sqlite/integer@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sqlite/datetime@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sqlite/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "isAdmin": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sqlite/integer@1",
+                  "kind": "scalar"
+                }
+              },
+              "lastUsedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "sqlite/datetime@1",
+                  "kind": "scalar"
+                }
+              },
+              "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sqlite/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "tokenHash": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sqlite/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "tokenHint": {
+                "nullable": true,
+                "type": {
+                  "codecId": "sqlite/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "bucket": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "bucketName"
+                  ],
+                  "targetFields": [
+                    "name"
+                  ]
+                },
+                "to": {
+                  "model": "Bucket",
+                  "namespace": "__unbound__"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "bucketName": {
+                  "column": "bucket_name"
+                },
+                "canRead": {
+                  "column": "can_read"
+                },
+                "canWrite": {
+                  "column": "can_write"
+                },
+                "createdAt": {
+                  "column": "created_at"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "isAdmin": {
+                  "column": "is_admin"
+                },
+                "lastUsedAt": {
+                  "column": "last_used_at"
+                },
+                "name": {
+                  "column": "name"
+                },
+                "tokenHash": {
+                  "column": "token_hash"
+                },
+                "tokenHint": {
+                  "column": "token_hint"
+                }
+              },
+              "namespaceId": "__unbound__",
+              "table": "api_keys"
+            }
+          },
           "Bucket": {
             "fields": {
               "createdAt": {
@@ -35,6 +166,21 @@
               }
             },
             "relations": {
+              "apiKeys": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "name"
+                  ],
+                  "targetFields": [
+                    "bucketName"
+                  ]
+                },
+                "to": {
+                  "model": "ApiKey",
+                  "namespace": "__unbound__"
+                }
+              },
               "objects": {
                 "cardinality": "1:N",
                 "on": {
@@ -160,6 +306,106 @@
       "__unbound__": {
         "entries": {
           "table": {
+            "api_keys": {
+              "columns": {
+                "bucket_name": {
+                  "codecId": "sqlite/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "can_read": {
+                  "codecId": "sqlite/integer@1",
+                  "nativeType": "integer",
+                  "nullable": false
+                },
+                "can_write": {
+                  "codecId": "sqlite/integer@1",
+                  "nativeType": "integer",
+                  "nullable": false
+                },
+                "created_at": {
+                  "codecId": "sqlite/datetime@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "sqlite/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "is_admin": {
+                  "codecId": "sqlite/integer@1",
+                  "nativeType": "integer",
+                  "nullable": false
+                },
+                "last_used_at": {
+                  "codecId": "sqlite/datetime@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "name": {
+                  "codecId": "sqlite/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "token_hash": {
+                  "codecId": "sqlite/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "token_hint": {
+                  "codecId": "sqlite/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "onUpdate": "cascade",
+                  "source": {
+                    "columns": [
+                      "bucket_name"
+                    ],
+                    "namespaceId": "__unbound__",
+                    "tableName": "api_keys"
+                  },
+                  "target": {
+                    "columns": [
+                      "name"
+                    ],
+                    "namespaceId": "__unbound__",
+                    "tableName": "buckets"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "bucket_name"
+                  ],
+                  "name": "api_keys_bucket_name_idx_a0195dbd",
+                  "prefix": "api_keys_bucket_name_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "token_hash"
+                  ]
+                }
+              ]
+            },
             "buckets": {
               "columns": {
                 "created_at": {
@@ -272,7 +518,7 @@
         "id": "__unbound__"
       }
     },
-    "storageHash": "6cd2f60e2db43f1825edb56bed3d34721dc167121d93ca8fd6e8aa411558d52b"
+    "storageHash": "58a7d9161a16a5ef297b9d7680490cbb724ae5ccd5886ff9ef969863b958b665"
   },
   "capabilities": {
     "sql": {

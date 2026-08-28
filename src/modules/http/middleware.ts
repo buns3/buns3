@@ -3,6 +3,7 @@ import { type } from "arktype";
 import { BucketName } from "../validation/bucket";
 import { errorResponse, validationErrorResponse } from "./errors";
 import { Key } from "../validation/object";
+import { apiKeyStorage } from "../api-keys/api-key-storage";
 
 export function bucketKeyMiddleware(req: {
   url: string;
@@ -33,4 +34,43 @@ export function bucketMiddleware(req: { params: { name: string } }) {
   }
 
   return { name };
+}
+
+export function requireAuth(capability?: "read" | "write" | "admin") {
+  return async (req: { headers: Headers }, ctx: { bucket?: string }) => {
+    const rawKey = req.headers.get("Authorization");
+    if (!rawKey) {
+      return errorResponse("INVALID_API_KEY");
+    }
+
+    if (!rawKey.toLowerCase().startsWith("bearer ")) {
+      return errorResponse("INVALID_API_KEY");
+    }
+
+    const key = rawKey.substring(7);
+    const result = await apiKeyStorage.verify(key);
+    if (!result.success) {
+      return errorResponse(result.code);
+    }
+
+    const apiKey = result.data;
+
+    if (capability) {
+      const isCapable = {
+        read: apiKey.canRead,
+        write: apiKey.canWrite,
+        admin: apiKey.isAdmin,
+      }[capability];
+
+      if (!isCapable) return errorResponse("KEY_NOT_CAPABLE");
+    }
+
+    if (apiKey.bucketName && ctx.bucket && apiKey.bucketName !== ctx.bucket) {
+      return errorResponse("KEY_NOT_CAPABLE");
+    }
+
+    return {
+      apiKey,
+    };
+  };
 }

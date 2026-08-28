@@ -1,10 +1,17 @@
 import { withMiddleware } from "$/lib/middleware";
 import { objectHeaders, uriEncodedKey } from "$/lib/request";
 import { fileStorage } from "../storage/file-storage";
-import { errorResponse } from "./errors";
-import { bucketKeyMiddleware, bucketMiddleware } from "./middleware";
+import { errorResponse, validationErrorResponse } from "./errors";
+import {
+  bucketKeyMiddleware,
+  bucketMiddleware,
+  requireAuth,
+} from "./middleware";
 import type { AppServer } from "./types";
 import { bucketStorage } from "../storage/bucket";
+import { CreateApiKey } from "../validation/api-key";
+import { type } from "arktype";
+import { apiKeyStorage } from "../api-keys/api-key-storage";
 
 export async function initServer(): Promise<AppServer> {
   const server = Bun.serve({
@@ -14,45 +21,51 @@ export async function initServer(): Promise<AppServer> {
       "/": Response.json({ message: "OK" }),
 
       "/:bucket/*": {
-        GET: withMiddleware([bucketKeyMiddleware], async (req, ctx, server) => {
-          const fileResult = await fileStorage.get(ctx.bucket, ctx.key);
-          if (!fileResult.success) {
-            return errorResponse(fileResult.code);
-          }
+        GET: withMiddleware(
+          [bucketKeyMiddleware, requireAuth("read")],
+          async (req, ctx, server) => {
+            const fileResult = await fileStorage.get(ctx.bucket, ctx.key);
+            if (!fileResult.success) {
+              return errorResponse(fileResult.code);
+            }
 
-          const headers = objectHeaders(fileResult.object);
-          return new Response(fileResult.file, { headers });
-        }),
+            const headers = objectHeaders(fileResult.object);
+            return new Response(fileResult.file, { headers });
+          },
+        ),
 
-        PUT: withMiddleware([bucketKeyMiddleware], async (req, ctx, server) => {
-          const stream = req.body;
-          if (!stream) return errorResponse("UNKNOWN");
+        PUT: withMiddleware(
+          [bucketKeyMiddleware, requireAuth("write")],
+          async (req, ctx, server) => {
+            const stream = req.body;
+            if (!stream) return errorResponse("UNKNOWN");
 
-          const contentType =
-            req.headers.get("content-type") ?? "application/octet-stream";
-          const fileResult = await fileStorage.put(
-            ctx.bucket,
-            ctx.key,
-            stream,
-            contentType,
-          );
-          if (!fileResult.success) {
-            return errorResponse(fileResult.code);
-          }
+            const contentType =
+              req.headers.get("content-type") ?? "application/octet-stream";
+            const fileResult = await fileStorage.put(
+              ctx.bucket,
+              ctx.key,
+              stream,
+              contentType,
+            );
+            if (!fileResult.success) {
+              return errorResponse(fileResult.code);
+            }
 
-          const headers = new Headers();
-          headers.set(
-            "Location",
-            `/${fileResult.object.bucketName}/${uriEncodedKey(fileResult.object.key)}`,
-          );
-          return Response.json(
-            { bucket: ctx.bucket, key: ctx.key },
-            { status: 201, headers },
-          );
-        }),
+            const headers = new Headers();
+            headers.set(
+              "Location",
+              `/${fileResult.object.bucketName}/${uriEncodedKey(fileResult.object.key)}`,
+            );
+            return Response.json(
+              { bucket: ctx.bucket, key: ctx.key },
+              { status: 201, headers },
+            );
+          },
+        ),
 
         DELETE: withMiddleware(
-          [bucketKeyMiddleware],
+          [bucketKeyMiddleware, requireAuth("write")],
           async (req, ctx, server) => {
             const fileResult = await fileStorage.delete(ctx.bucket, ctx.key);
             if (!fileResult.success) {
@@ -64,7 +77,7 @@ export async function initServer(): Promise<AppServer> {
         ),
 
         HEAD: withMiddleware(
-          [bucketKeyMiddleware],
+          [bucketKeyMiddleware, requireAuth("read")],
           async (req, ctx, server) => {
             const fileResult = await fileStorage.get(ctx.bucket, ctx.key);
             if (!fileResult.success) {
@@ -79,62 +92,99 @@ export async function initServer(): Promise<AppServer> {
       },
 
       "/_admin/buckets": {
-        GET: async () => {
+        GET: withMiddleware([requireAuth("admin")], async () => {
           const bucketsResult = await bucketStorage.list();
           if (!bucketsResult.success) {
             return errorResponse(bucketsResult.code);
           }
 
           return Response.json({ buckets: bucketsResult.buckets });
-        },
+        }),
 
-        HEAD: () => {
+        HEAD: withMiddleware([requireAuth("admin")], () => {
           return new Response(null);
-        },
+        }),
+      },
+
+      "/_admin/whoami": {
+        GET: withMiddleware([requireAuth()], async (req, ctx, server) => {
+          return Response.json({ apiKey: ctx.apiKey });
+        }),
+      },
+
+      "/_admin/keys": {
+        POST: withMiddleware(
+          [requireAuth("admin")],
+          async (req, ctx, server) => {
+            const input = CreateApiKey(await req.json());
+            if (input instanceof type.errors) {
+              return validationErrorResponse(input);
+            }
+
+            const result = await apiKeyStorage.create(input);
+            if (!result.success) {
+              return errorResponse(result.code);
+            }
+
+            return Response.json(result.data);
+          },
+        ),
       },
 
       "/_admin/buckets/:name": {
-        GET: withMiddleware([bucketMiddleware], async (req, ctx, server) => {
-          const result = await bucketStorage.get(ctx.name);
-          if (!result.success) {
-            return errorResponse(result.code);
-          }
+        GET: withMiddleware(
+          [bucketMiddleware, requireAuth("admin")],
+          async (req, ctx, server) => {
+            const result = await bucketStorage.get(ctx.name);
+            if (!result.success) {
+              return errorResponse(result.code);
+            }
 
-          return Response.json({ bucket: result.bucket });
-        }),
+            return Response.json({ bucket: result.bucket });
+          },
+        ),
 
-        PUT: withMiddleware([bucketMiddleware], async (req, ctx, server) => {
-          const result = await bucketStorage.create(ctx.name);
-          if (!result.success) {
-            return errorResponse(result.code);
-          }
+        PUT: withMiddleware(
+          [bucketMiddleware, requireAuth("admin")],
+          async (req, ctx, server) => {
+            const result = await bucketStorage.create(ctx.name);
+            if (!result.success) {
+              return errorResponse(result.code);
+            }
 
-          const headers = new Headers();
-          headers.set("Location", `/${ctx.name}`);
-          return Response.json(
-            { bucket: result.bucket },
-            { status: 201, headers },
-          );
-        }),
+            const headers = new Headers();
+            headers.set("Location", `/${ctx.name}`);
+            return Response.json(
+              { bucket: result.bucket },
+              { status: 201, headers },
+            );
+          },
+        ),
 
-        DELETE: withMiddleware([bucketMiddleware], async (req, ctx, server) => {
-          const result = await bucketStorage.delete(ctx.name);
-          if (!result.success) {
-            return errorResponse(result.code);
-          }
+        DELETE: withMiddleware(
+          [bucketMiddleware, requireAuth("admin")],
+          async (req, ctx, server) => {
+            const result = await bucketStorage.delete(ctx.name);
+            if (!result.success) {
+              return errorResponse(result.code);
+            }
 
-          return new Response(null, { status: 204 });
-        }),
+            return new Response(null, { status: 204 });
+          },
+        ),
 
-        HEAD: withMiddleware([bucketMiddleware], async (req, ctx, server) => {
-          const result = await bucketStorage.head(ctx.name);
-          if (!result.success) {
-            const valResponse = errorResponse(result.code);
-            return new Response(null, { status: valResponse.status });
-          }
+        HEAD: withMiddleware(
+          [bucketMiddleware, requireAuth("admin")],
+          async (req, ctx, server) => {
+            const result = await bucketStorage.head(ctx.name);
+            if (!result.success) {
+              const valResponse = errorResponse(result.code);
+              return new Response(null, { status: valResponse.status });
+            }
 
-          return new Response(null);
-        }),
+            return new Response(null);
+          },
+        ),
       },
     },
 

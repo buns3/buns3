@@ -16,7 +16,7 @@ import type {
 } from '@prisma/orm-sqlite/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'58a7d9161a16a5ef297b9d7680490cbb724ae5ccd5886ff9ef969863b958b665'>;
+  StorageHashBase<'48c976c9fdaddf754b92b05cd8b99b5f48cdec5df55ff85b353c40620b1fa107'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'260b8608d1aacaf1f690779a6cff39a12947c599597c5ba464ca75b9e775df53'>;
@@ -192,8 +192,8 @@ export type StorageColumnTypes = {
       readonly is_admin: CodecTypes['sqlite/integer@1']['output'];
       readonly last_used_at: CodecTypes['sqlite/datetime@1']['output'] | null;
       readonly name: CodecTypes['sqlite/text@1']['output'];
-      readonly token_hash: CodecTypes['sqlite/text@1']['output'];
       readonly token_hint: CodecTypes['sqlite/text@1']['output'] | null;
+      readonly tokenHash: CodecTypes['sqlite/text@1']['output'];
     };
     readonly buckets: {
       readonly created_at: CodecTypes['sqlite/datetime@1']['output'];
@@ -220,8 +220,8 @@ export type StorageColumnInputTypes = {
       readonly is_admin: CodecTypes['sqlite/integer@1']['input'];
       readonly last_used_at: CodecTypes['sqlite/datetime@1']['input'] | null;
       readonly name: CodecTypes['sqlite/text@1']['input'];
-      readonly token_hash: CodecTypes['sqlite/text@1']['input'];
       readonly token_hint: CodecTypes['sqlite/text@1']['input'] | null;
+      readonly tokenHash: CodecTypes['sqlite/text@1']['input'];
     };
     readonly buckets: {
       readonly created_at: CodecTypes['sqlite/datetime@1']['input'];
@@ -267,7 +267,7 @@ type ContractBase = Omit<
                   readonly codecId: 'sqlite/text@1';
                   readonly nullable: false;
                 };
-                readonly token_hash: {
+                readonly tokenHash: {
                   readonly nativeType: 'text';
                   readonly codecId: 'sqlite/text@1';
                   readonly nullable: false;
@@ -310,7 +310,7 @@ type ContractBase = Omit<
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [{ readonly columns: readonly ['token_hash'] }];
+              uniques: readonly [{ readonly columns: readonly ['tokenHash'] }];
               indexes: readonly [
                 {
                   readonly name: 'api_keys_bucket_name_idx_a0195dbd';
@@ -496,7 +496,7 @@ type ContractBase = Omit<
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly name: { readonly column: 'name' };
-                readonly tokenHash: { readonly column: 'token_hash' };
+                readonly tokenHash: { readonly column: 'tokenHash' };
                 readonly tokenHint: { readonly column: 'token_hint' };
                 readonly bucketName: { readonly column: 'bucket_name' };
                 readonly createdAt: { readonly column: 'created_at' };

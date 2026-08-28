@@ -3,6 +3,7 @@ model Bucket {
   createdAt DateTime @default(now()) @map("created_at")
 
   objects Object[]
+  apiKeys ApiKey[]
 
   @@map("buckets")
 }
@@ -18,4 +19,21 @@ model Object {
 
   @@unique([bucketName, key])
   @@map("objects")
+}
+
+model ApiKey {
+  id         String    @id
+  name       String
+  tokenHash  String    @unique @map("token_hash")
+  tokenHint  String?   @map("token_hint")
+  bucketName String?   @map("bucket_name")
+  bucket     Bucket?   @relation(references: [name], fields: [bucketName], onDelete: Cascade, onUpdate: Cascade)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastUsedAt DateTime? @map("last_used_at")
+
+  canRead  Int @map("can_read")
+  canWrite Int @map("can_write")
+  isAdmin  Int @map("is_admin")
+
+  @@map("api_keys")
 }

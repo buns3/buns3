@@ -1,9 +1,10 @@
 import type { Buns3ErrorCode } from "$/modules/storage/errors";
 import type { type } from "arktype";
+import type { Buns3ApiKeyErrorCode } from "../api-keys/errors";
 
 export type Buns3HTTPErrorCode = "VALIDATION_ERROR";
 
-export function errorResponse(code: Buns3ErrorCode) {
+export function errorResponse(code: Buns3ErrorCode | Buns3ApiKeyErrorCode) {
   switch (code) {
     case "KEY_NOT_FOUND":
       return Response.json({ code }, { status: 404 });
@@ -22,6 +23,15 @@ export function errorResponse(code: Buns3ErrorCode) {
 
     case "FS_ERROR":
       return Response.json({ code }, { status: 500 });
+
+    case "INVALID_API_KEY": {
+      const headers = new Headers();
+      headers.set("WWW-Authenticate", "Bearer");
+      return Response.json({ code }, { status: 401, headers });
+    }
+
+    case "KEY_NOT_CAPABLE":
+      return Response.json({ code }, { status: 403 });
 
     case "UNKNOWN":
     default:

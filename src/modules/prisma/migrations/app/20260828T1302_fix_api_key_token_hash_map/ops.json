@@ -1,0 +1,160 @@
+[
+  {
+    "id": "column.api_keys.token_hash",
+    "label": "Add column token_hash on api_keys",
+    "summary": "Adds column token_hash on api_keys",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "column",
+        "name": "token_hash",
+        "table": "api_keys"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"token_hash\" is missing",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM pragma_table_info(?) WHERE \"name\" = ?",
+        "params": [
+          "api_keys",
+          "token_hash"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"token_hash\"",
+        "sql": "ALTER TABLE \"api_keys\" ADD COLUMN \"token_hash\" TEXT NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"token_hash\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM pragma_table_info(?) WHERE \"name\" = ?",
+        "params": [
+          "api_keys",
+          "token_hash"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "recreateTable.api_keys",
+    "label": "Recreate table api_keys",
+    "summary": "Recreates table api_keys to apply schema changes: database/api_keys/unique:token_hash; database/api_keys/unique:tokenHash",
+    "operationClass": "destructive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "table",
+        "name": "api_keys"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"api_keys\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "api_keys"
+        ]
+      },
+      {
+        "description": "ensure temp table \"_prisma_new_api_keys\" does not exist",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "_prisma_new_api_keys"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create new table \"_prisma_new_api_keys\" with desired schema",
+        "sql": "CREATE TABLE \"_prisma_new_api_keys\" (\n  \"bucket_name\" TEXT,\n  \"can_read\" INTEGER NOT NULL,\n  \"can_write\" INTEGER NOT NULL,\n  \"created_at\" TEXT DEFAULT (datetime('now')) NOT NULL,\n  \"id\" TEXT NOT NULL,\n  \"is_admin\" INTEGER NOT NULL,\n  \"last_used_at\" TEXT,\n  \"name\" TEXT NOT NULL,\n  \"token_hash\" TEXT NOT NULL,\n  \"token_hint\" TEXT,\n  PRIMARY KEY (\"id\"),\n  UNIQUE (\"token_hash\"),\n  FOREIGN KEY (\"bucket_name\") REFERENCES \"buckets\" (\"name\") ON DELETE CASCADE ON UPDATE CASCADE\n)"
+      },
+      {
+        "description": "copy data from \"api_keys\" to \"_prisma_new_api_keys\"",
+        "sql": "INSERT INTO \"_prisma_new_api_keys\" (\"bucket_name\", \"can_read\", \"can_write\", \"created_at\", \"id\", \"is_admin\", \"last_used_at\", \"name\", \"token_hint\") SELECT \"bucket_name\", \"can_read\", \"can_write\", \"created_at\", \"id\", \"is_admin\", \"last_used_at\", \"name\", \"token_hint\" FROM \"api_keys\""
+      },
+      {
+        "description": "drop old table \"api_keys\"",
+        "sql": "DROP TABLE \"api_keys\""
+      },
+      {
+        "description": "rename \"_prisma_new_api_keys\" to \"api_keys\"",
+        "sql": "ALTER TABLE \"_prisma_new_api_keys\" RENAME TO \"api_keys\""
+      },
+      {
+        "description": "recreate index \"api_keys_bucket_name_idx_a0195dbd\" on \"api_keys\"",
+        "sql": "CREATE INDEX \"api_keys_bucket_name_idx_a0195dbd\" ON \"api_keys\" (\"bucket_name\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"api_keys\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "api_keys"
+        ]
+      },
+      {
+        "description": "verify temp table \"_prisma_new_api_keys\" is gone",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "_prisma_new_api_keys"
+        ]
+      },
+      {
+        "description": "verify unique constraint (token_hash) on \"api_keys\"",
+        "sql": "SELECT EXISTS (SELECT 1 FROM pragma_index_list('api_keys') l WHERE l.\"unique\" = 1 AND (SELECT COUNT(*) FROM pragma_index_info(l.name)) = 1 AND (SELECT COUNT(*) FROM pragma_index_info(l.name) WHERE name IN ('token_hash')) = 1)"
+      }
+    ]
+  },
+  {
+    "id": "dropColumn.api_keys.tokenHash",
+    "label": "Drop column tokenHash on api_keys",
+    "summary": "Drops column tokenHash on api_keys which is not in the contract",
+    "operationClass": "destructive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "column",
+        "name": "tokenHash",
+        "table": "api_keys"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"tokenHash\" exists on \"api_keys\"",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM pragma_table_info(?) WHERE \"name\" = ?",
+        "params": [
+          "api_keys",
+          "tokenHash"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop column \"tokenHash\" from \"api_keys\"",
+        "sql": "ALTER TABLE \"api_keys\" DROP COLUMN \"tokenHash\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"tokenHash\" is gone from \"api_keys\"",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM pragma_table_info(?) WHERE \"name\" = ?",
+        "params": [
+          "api_keys",
+          "tokenHash"
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,84 @@
+[
+  {
+    "id": "table.api_keys",
+    "label": "Create table api_keys",
+    "summary": "Creates table api_keys with required columns",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "table",
+        "name": "api_keys"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"api_keys\" does not exist",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "api_keys"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"api_keys\"",
+        "sql": "CREATE TABLE \"api_keys\" (\n  \"bucket_name\" TEXT,\n  \"can_read\" INTEGER NOT NULL,\n  \"can_write\" INTEGER NOT NULL,\n  \"created_at\" TEXT NOT NULL DEFAULT (datetime('now')),\n  \"id\" TEXT NOT NULL,\n  \"is_admin\" INTEGER NOT NULL,\n  \"last_used_at\" TEXT,\n  \"name\" TEXT NOT NULL,\n  \"tokenHash\" TEXT NOT NULL,\n  \"token_hint\" TEXT,\n  PRIMARY KEY (\"id\"),\n  UNIQUE (\"tokenHash\"),\n  FOREIGN KEY (\"bucket_name\") REFERENCES \"buckets\" (\"name\") ON DELETE CASCADE ON UPDATE CASCADE\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"api_keys\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "api_keys"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.api_keys.api_keys_bucket_name_idx_a0195dbd",
+    "label": "Create index api_keys_bucket_name_idx_a0195dbd on api_keys",
+    "summary": "Creates index api_keys_bucket_name_idx_a0195dbd on api_keys",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "index",
+        "name": "api_keys_bucket_name_idx_a0195dbd",
+        "table": "api_keys"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"api_keys_bucket_name_idx_a0195dbd\" is missing",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "index",
+          "api_keys_bucket_name_idx_a0195dbd"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"api_keys_bucket_name_idx_a0195dbd\"",
+        "sql": "CREATE INDEX \"api_keys_bucket_name_idx_a0195dbd\" ON \"api_keys\" (\"bucket_name\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"api_keys_bucket_name_idx_a0195dbd\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "index",
+          "api_keys_bucket_name_idx_a0195dbd"
+        ]
+      }
+    ]
+  }
+]
