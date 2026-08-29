@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>buns3 tester</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- pin Babel 7: v8's react preset defaults to the automatic JSX runtime, which emits
+       import statements that cannot run in a classic script tag -->
+  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #14161a; color: #d7dae0; font: 14px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace; }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+    h1 { font-size: 18px; margin: 0 0 4px; } h1 span { color: #e8a33d; }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: #8b93a1; margin: 28px 0 8px; }
+    .sub { color: #8b93a1; margin: 0 0 20px; }
+    fieldset { border: 1px solid #2a2e36; border-radius: 8px; padding: 12px 14px; margin: 0 0 12px; }
+    label { display: block; color: #8b93a1; font-size: 12px; margin: 8px 0 2px; }
+    input[type=text], input[type=password] { width: 100%; background: #1c1f25; color: #d7dae0; border: 1px solid #2a2e36; border-radius: 6px; padding: 7px 9px; font: inherit; }
+    input:focus { outline: none; border-color: #e8a33d; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; } .row > div { flex: 1; min-width: 180px; }
+    button { background: #262b33; color: #d7dae0; border: 1px solid #3a404b; border-radius: 6px; padding: 7px 14px; font: inherit; cursor: pointer; margin: 10px 8px 0 0; }
+    button:hover { border-color: #e8a33d; } button:disabled { opacity: 0.4; cursor: default; }
+    button.primary { background: #e8a33d; border-color: #e8a33d; color: #14161a; font-weight: 600; }
+    .check { display: flex; align-items: center; gap: 6px; margin-top: 10px; color: #8b93a1; }
+    .log { display: flex; flex-direction: column; gap: 8px; }
+    .entry { border: 1px solid #2a2e36; border-left-width: 4px; border-radius: 6px; padding: 8px 12px; background: #1c1f25; }
+    .entry.ok { border-left-color: #5fb26a; } .entry.err { border-left-color: #d05f5f; }
+    .entry .head { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+    .entry .status { font-weight: 700; } .ok .status { color: #5fb26a; } .err .status { color: #d05f5f; }
+    .entry .meta { color: #8b93a1; font-size: 12px; }
+    .entry pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-all; color: #aeb6c2; font-size: 12px; max-height: 200px; overflow: auto; }
+    .entry a { color: #e8a33d; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-presets="react">
+    const { useState, useRef } = React;
+
+    const store = {
+      get: (k, fallback) => { try { return localStorage.getItem(k) ?? fallback; } catch { return fallback; } },
+      set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+    };
+
+    // When served from a bucket (/<bucket>/<key>) infer the bucket from the URL.
+    function inferBucket() {
+      const seg = location.pathname.split("/").filter(Boolean);
+      return seg.length >= 2 ? seg[0] : "testing";
+    }
+
+    const INTERESTING_HEADERS = [
+      "etag", "content-type", "content-length", "last-modified",
+      "content-disposition", "location", "www-authenticate", "content-range", "accept-ranges",
+    ];
+
+    function App() {
+      const [base, setBase] = useState(store.get("buns3.base", location.origin.startsWith("http") ? location.origin : "http://localhost:8000"));
+      const [bucket, setBucket] = useState(store.get("buns3.bucket", inferBucket()));
+      const [apiKey, setApiKey] = useState(store.get("buns3.key", ""));
+      const [anonymous, setAnonymous] = useState(false);
+      const [objectKey, setObjectKey] = useState("");
+      const [contentType, setContentType] = useState("");
+      const [busy, setBusy] = useState(false);
+      const [log, setLog] = useState([]);
+      const fileRef = useRef(null);
+
+      const persist = (setter, storeKey) => (e) => { setter(e.target.value); store.set(storeKey, e.target.value); };
+
+      function objectUrl(key) {
+        return `${base.replace(/\/$/, "")}/${bucket}/${encodeURIComponent(key)}`;
+      }
+
+      function authHeaders() {
+        if (anonymous || !apiKey) return {};
+        return { Authorization: `Bearer ${apiKey}` };
+      }
+
+      async function run(method, url, init = {}, note = "") {
+        setBusy(true);
+        const started = performance.now();
+        let entry;
+        try {
+          const resp = await fetch(url, { method, ...init, headers: { ...authHeaders(), ...(init.headers ?? {}) } });
+          const ms = Math.round(performance.now() - started);
+          const headers = INTERESTING_HEADERS
+            .map((h) => [h, resp.headers.get(h)])
+            .filter(([, v]) => v !== null)
+            .map(([h, v]) => `${h}: ${v}`)
+            .join("\n");
+          let body = "";
+          if (method !== "HEAD") {
+            const text = await resp.text();
+            body = text.length > 2000 ? text.slice(0, 2000) + `\n… (${text.length} bytes total)` : text;
+          }
+          entry = { ok: resp.ok, status: `${resp.status} ${resp.statusText}`, method, url, ms, note, headers, body };
+        } catch (err) {
+          entry = { ok: false, status: "network error", method, url, ms: Math.round(performance.now() - started), note, headers: "", body: String(err) };
+        }
+        setLog((l) => [{ id: Date.now() + Math.random(), anon: anonymous || !apiKey, ...entry }, ...l]);
+        setBusy(false);
+      }
+
+      async function upload() {
+        const file = fileRef.current?.files?.[0];
+        if (!file) return;
+        const key = objectKey || file.name;
+        const type = contentType || file.type || "application/octet-stream";
+        await run("PUT", objectUrl(key), { body: file, headers: { "Content-Type": type } }, `upload ${file.name} as "${key}" (${type})`);
+      }
+
+      const keyOrFile = () => objectKey || fileRef.current?.files?.[0]?.name || "";
+
+      return (
+        <div className="wrap">
+          <h1><span>buns3</span> tester</h1>
+          <p className="sub">requests go to the server below; auth optional — uncheck nothing and clear the key to probe public-read</p>
+
+          <h2>Connection</h2>
+          <fieldset>
+            <div className="row">
+              <div><label>server</label><input type="text" value={base} onChange={persist(setBase, "buns3.base")} /></div>
+              <div><label>bucket</label><input type="text" value={bucket} onChange={persist(setBucket, "buns3.bucket")} /></div>
+            </div>
+            <label>api key (stored in localStorage)</label>
+            <input type="password" value={apiKey} onChange={persist(setApiKey, "buns3.key")} placeholder="buns3_…" />
+            <div className="check">
+              <input id="anon" type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
+              <label htmlFor="anon" style={{ margin: 0 }}>anonymous — omit Authorization header even if a key is set</label>
+            </div>
+          </fieldset>
+
+          <h2>Upload</h2>
+          <fieldset>
+            <label>file</label>
+            <input type="file" ref={fileRef} onChange={(e) => { const f = e.target.files?.[0]; if (f) { setObjectKey(f.name); setContentType(f.type || ""); } }} />
+            <div className="row">
+              <div><label>key (defaults to filename)</label><input type="text" value={objectKey} onChange={(e) => setObjectKey(e.target.value)} /></div>
+              <div><label>content-type (stored verbatim, no sniffing)</label><input type="text" value={contentType} onChange={(e) => setContentType(e.target.value)} placeholder="application/octet-stream" /></div>
+            </div>
+            <button className="primary" disabled={busy} onClick={upload}>PUT</button>
+          </fieldset>
+
+          <h2>Probe a key</h2>
+          <fieldset>
+            <label>object key</label>
+            <input type="text" value={objectKey} onChange={(e) => setObjectKey(e.target.value)} placeholder="README.md" />
+            <button disabled={busy || !keyOrFile()} onClick={() => run("GET", objectUrl(keyOrFile()))}>GET</button>
+            <button disabled={busy || !keyOrFile()} onClick={() => run("HEAD", objectUrl(keyOrFile()))}>HEAD</button>
+            <button disabled={busy || !keyOrFile()} onClick={() => { if (confirm(`DELETE ${keyOrFile()}?`)) run("DELETE", objectUrl(keyOrFile())); }}>DELETE</button>
+            <button disabled={busy} onClick={() => run("GET", `${base.replace(/\/$/, "")}/_admin/whoami`)}>whoami</button>
+          </fieldset>
+
+          <h2>Log</h2>
+          <div className="log">
+            {log.length === 0 && <p className="sub">nothing yet</p>}
+            {log.map((e) => (
+              <div key={e.id} className={"entry " + (e.ok ? "ok" : "err")}>
+                <div className="head">
+                  <span className="status">{e.status}</span>
+                  <span>{e.method} <a href={e.url} target="_blank" rel="noreferrer">{decodeURIComponent(e.url.replace(base, ""))}</a></span>
+                  <span className="meta">{e.ms}ms{e.anon ? " · anon" : ""}{e.note ? " · " + e.note : ""}</span>
+                </div>
+                {e.headers && <pre>{e.headers}</pre>}
+                {e.body && <pre>{e.body}</pre>}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
