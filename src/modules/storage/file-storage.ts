@@ -102,11 +102,13 @@ export const fileStorage: Buns3Storage = {
             id,
             contentType: contentType,
             size: tempFile.size,
+            createdAt: new Date(),
           },
           update: {
             id,
             contentType: contentType,
             size: tempFile.size,
+            createdAt: new Date(),
           },
         });
 

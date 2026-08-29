@@ -72,6 +72,8 @@ export const apiKeyStorage: Buns3ApiKeyStorage = {
         isAdmin: input.isAdmin ? 1 : 0,
         tokenHash,
         tokenHint,
+        createdAt: new Date(),
+        lastUsedAt: null,
       });
 
       return {

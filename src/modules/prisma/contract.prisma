@@ -1,6 +1,6 @@
 model Bucket {
   name      String   @id
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @map("created_at")
 
   objects Object[]
   apiKeys ApiKey[]
@@ -15,7 +15,7 @@ model Object {
   bucket      Bucket   @relation(references: [name], fields: [bucketName], onDelete: Restrict, onUpdate: Restrict)
   size        Int
   contentType String   @map("content_type")
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt   DateTime @map("created_at")
 
   @@unique([bucketName, key])
   @@map("objects")
@@ -28,7 +28,7 @@ model ApiKey {
   tokenHint  String?   @map("token_hint")
   bucketName String?   @map("bucket_name")
   bucket     Bucket?   @relation(references: [name], fields: [bucketName], onDelete: Cascade, onUpdate: Cascade)
-  createdAt  DateTime  @default(now()) @map("created_at")
+  createdAt  DateTime  @map("created_at")
   lastUsedAt DateTime? @map("last_used_at")
 
   canRead  Int @map("can_read")

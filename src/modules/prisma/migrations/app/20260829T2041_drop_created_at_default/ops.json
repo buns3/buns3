@@ -1,0 +1,226 @@
+[
+  {
+    "id": "recreateTable.api_keys",
+    "label": "Recreate table api_keys",
+    "summary": "Recreates table api_keys to apply schema changes: database/api_keys/column:created_at/default",
+    "operationClass": "destructive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "table",
+        "name": "api_keys"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"api_keys\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "api_keys"
+        ]
+      },
+      {
+        "description": "ensure temp table \"_prisma_new_api_keys\" does not exist",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "_prisma_new_api_keys"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create new table \"_prisma_new_api_keys\" with desired schema",
+        "sql": "CREATE TABLE \"_prisma_new_api_keys\" (\n  \"bucket_name\" TEXT,\n  \"can_read\" INTEGER NOT NULL,\n  \"can_write\" INTEGER NOT NULL,\n  \"created_at\" TEXT NOT NULL,\n  \"id\" TEXT NOT NULL,\n  \"is_admin\" INTEGER NOT NULL,\n  \"last_used_at\" TEXT,\n  \"name\" TEXT NOT NULL,\n  \"token_hash\" TEXT NOT NULL,\n  \"token_hint\" TEXT,\n  PRIMARY KEY (\"id\"),\n  UNIQUE (\"token_hash\"),\n  FOREIGN KEY (\"bucket_name\") REFERENCES \"buckets\" (\"name\") ON DELETE CASCADE ON UPDATE CASCADE\n)"
+      },
+      {
+        "description": "copy data from \"api_keys\" to \"_prisma_new_api_keys\"",
+        "sql": "INSERT INTO \"_prisma_new_api_keys\" (\"bucket_name\", \"can_read\", \"can_write\", \"created_at\", \"id\", \"is_admin\", \"last_used_at\", \"name\", \"token_hash\", \"token_hint\") SELECT \"bucket_name\", \"can_read\", \"can_write\", \"created_at\", \"id\", \"is_admin\", \"last_used_at\", \"name\", \"token_hash\", \"token_hint\" FROM \"api_keys\""
+      },
+      {
+        "description": "drop old table \"api_keys\"",
+        "sql": "DROP TABLE \"api_keys\""
+      },
+      {
+        "description": "rename \"_prisma_new_api_keys\" to \"api_keys\"",
+        "sql": "ALTER TABLE \"_prisma_new_api_keys\" RENAME TO \"api_keys\""
+      },
+      {
+        "description": "recreate index \"api_keys_bucket_name_idx_a0195dbd\" on \"api_keys\"",
+        "sql": "CREATE INDEX \"api_keys_bucket_name_idx_a0195dbd\" ON \"api_keys\" (\"bucket_name\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"api_keys\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "api_keys"
+        ]
+      },
+      {
+        "description": "verify temp table \"_prisma_new_api_keys\" is gone",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "_prisma_new_api_keys"
+        ]
+      },
+      {
+        "description": "verify \"created_at\" has no default on \"api_keys\"",
+        "sql": "SELECT COUNT(*) > 0 FROM pragma_table_info('api_keys') WHERE name = 'created_at' AND dflt_value IS NULL"
+      }
+    ]
+  },
+  {
+    "id": "recreateTable.buckets",
+    "label": "Recreate table buckets",
+    "summary": "Recreates table buckets to apply schema changes: database/buckets/column:created_at/default",
+    "operationClass": "destructive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "table",
+        "name": "buckets"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"buckets\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "buckets"
+        ]
+      },
+      {
+        "description": "ensure temp table \"_prisma_new_buckets\" does not exist",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "_prisma_new_buckets"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create new table \"_prisma_new_buckets\" with desired schema",
+        "sql": "CREATE TABLE \"_prisma_new_buckets\" (\n  \"created_at\" TEXT NOT NULL,\n  \"name\" TEXT NOT NULL,\n  PRIMARY KEY (\"name\")\n)"
+      },
+      {
+        "description": "copy data from \"buckets\" to \"_prisma_new_buckets\"",
+        "sql": "INSERT INTO \"_prisma_new_buckets\" (\"created_at\", \"name\") SELECT \"created_at\", \"name\" FROM \"buckets\""
+      },
+      {
+        "description": "drop old table \"buckets\"",
+        "sql": "DROP TABLE \"buckets\""
+      },
+      {
+        "description": "rename \"_prisma_new_buckets\" to \"buckets\"",
+        "sql": "ALTER TABLE \"_prisma_new_buckets\" RENAME TO \"buckets\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"buckets\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "buckets"
+        ]
+      },
+      {
+        "description": "verify temp table \"_prisma_new_buckets\" is gone",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "_prisma_new_buckets"
+        ]
+      },
+      {
+        "description": "verify \"created_at\" has no default on \"buckets\"",
+        "sql": "SELECT COUNT(*) > 0 FROM pragma_table_info('buckets') WHERE name = 'created_at' AND dflt_value IS NULL"
+      }
+    ]
+  },
+  {
+    "id": "recreateTable.objects",
+    "label": "Recreate table objects",
+    "summary": "Recreates table objects to apply schema changes: database/objects/column:created_at/default",
+    "operationClass": "destructive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "table",
+        "name": "objects"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"objects\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "objects"
+        ]
+      },
+      {
+        "description": "ensure temp table \"_prisma_new_objects\" does not exist",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "_prisma_new_objects"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create new table \"_prisma_new_objects\" with desired schema",
+        "sql": "CREATE TABLE \"_prisma_new_objects\" (\n  \"bucket_name\" TEXT NOT NULL,\n  \"content_type\" TEXT NOT NULL,\n  \"created_at\" TEXT NOT NULL,\n  \"id\" TEXT NOT NULL,\n  \"key\" TEXT NOT NULL,\n  \"size\" INTEGER NOT NULL,\n  PRIMARY KEY (\"id\"),\n  UNIQUE (\"bucket_name\", \"key\"),\n  FOREIGN KEY (\"bucket_name\") REFERENCES \"buckets\" (\"name\") ON DELETE RESTRICT ON UPDATE RESTRICT\n)"
+      },
+      {
+        "description": "copy data from \"objects\" to \"_prisma_new_objects\"",
+        "sql": "INSERT INTO \"_prisma_new_objects\" (\"bucket_name\", \"content_type\", \"created_at\", \"id\", \"key\", \"size\") SELECT \"bucket_name\", \"content_type\", \"created_at\", \"id\", \"key\", \"size\" FROM \"objects\""
+      },
+      {
+        "description": "drop old table \"objects\"",
+        "sql": "DROP TABLE \"objects\""
+      },
+      {
+        "description": "rename \"_prisma_new_objects\" to \"objects\"",
+        "sql": "ALTER TABLE \"_prisma_new_objects\" RENAME TO \"objects\""
+      },
+      {
+        "description": "recreate index \"objects_bucket_name_idx_a0195dbd\" on \"objects\"",
+        "sql": "CREATE INDEX \"objects_bucket_name_idx_a0195dbd\" ON \"objects\" (\"bucket_name\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"objects\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "objects"
+        ]
+      },
+      {
+        "description": "verify temp table \"_prisma_new_objects\" is gone",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "_prisma_new_objects"
+        ]
+      },
+      {
+        "description": "verify \"created_at\" has no default on \"objects\"",
+        "sql": "SELECT COUNT(*) > 0 FROM pragma_table_info('objects') WHERE name = 'created_at' AND dflt_value IS NULL"
+      }
+    ]
+  }
+]

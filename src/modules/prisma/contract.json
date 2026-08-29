@@ -325,10 +325,6 @@
                 },
                 "created_at": {
                   "codecId": "sqlite/datetime@1",
-                  "default": {
-                    "expression": "now()",
-                    "kind": "function"
-                  },
                   "nativeType": "text",
                   "nullable": false
                 },
@@ -410,10 +406,6 @@
               "columns": {
                 "created_at": {
                   "codecId": "sqlite/datetime@1",
-                  "default": {
-                    "expression": "now()",
-                    "kind": "function"
-                  },
                   "nativeType": "text",
                   "nullable": false
                 },
@@ -446,10 +438,6 @@
                 },
                 "created_at": {
                   "codecId": "sqlite/datetime@1",
-                  "default": {
-                    "expression": "now()",
-                    "kind": "function"
-                  },
                   "nativeType": "text",
                   "nullable": false
                 },
@@ -518,7 +506,7 @@
         "id": "__unbound__"
       }
     },
-    "storageHash": "58a7d9161a16a5ef297b9d7680490cbb724ae5ccd5886ff9ef969863b958b665"
+    "storageHash": "b9a634d0340f9264d69d21e2a89b6ef0cfe15767217f9419b637806e719a547e"
   },
   "capabilities": {
     "sql": {

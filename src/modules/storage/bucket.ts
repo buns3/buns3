@@ -49,7 +49,7 @@ export const bucketStorage: Buns3BucketStorage = {
       const newBucket = await db.transaction(async (tx) => {
         const created = await tx.orm.Bucket.include("objects", (o) =>
           o.count(),
-        ).create({ name: bucket });
+        ).create({ name: bucket, createdAt: new Date() });
 
         await mkdir(bucketPath, { recursive: true });
         return created;
