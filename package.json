@@ -16,8 +16,12 @@
     "typescript": "^7"
   },
   "dependencies": {
+    "@elysia/openapi": "2.0.0-beta.1",
     "@prisma/orm-sqlite": "^8.0.0-rc.8",
     "arktype": "^2.2.3",
-    "elysia": "^2.0.0-beta.10"
+    "elysia": "2.0.0-beta.10"
+  },
+  "patchedDependencies": {
+    "@elysia/openapi@2.0.0-beta.1": "patches/@elysia%2Fopenapi@2.0.0-beta.1.patch"
   }
 }

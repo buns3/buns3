@@ -10,6 +10,7 @@ import { apiKeyStorage } from "../api-keys/api-key-storage";
 import { type } from "arktype";
 import { bucketStorage } from "../storage/bucket";
 import { BucketName } from "../validation/bucket";
+import openapi from "@elysia/openapi";
 
 export async function initServer() {
   const app = new Elysia({
@@ -17,6 +18,28 @@ export async function initServer() {
   })
     .use(useErrorHandler)
     .use(useAuth)
+    .use(
+      openapi({
+        exclude: {
+          paths: ["/:bucket/*"],
+        },
+        documentation: {
+          components: {
+            securitySchemes: {
+              bearerAuth: {
+                type: "http",
+                scheme: "bearer",
+                bearerFormat: "buns3 API key",
+              },
+            },
+          },
+          security: [{ bearerAuth: [] }],
+        },
+      }),
+    )
+
+    .get("/", () => ({ message: "OK" }))
+
     // /bucket/key routes
     .group("/:bucket/*", (group) =>
       group

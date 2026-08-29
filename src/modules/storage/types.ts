@@ -3,6 +3,7 @@ import type { Buns3ErrorCode } from "$/lib/error-codes";
 import type { Contract } from "../prisma/contract";
 
 export type Bucket = DefaultModelRow<Contract, "Bucket">;
+export type BucketWithCount = Bucket & { objects: number };
 export type StorageObject = DefaultModelRow<Contract, "Object">;
 
 export type Buns3FileResult<TFile> = Promise<
@@ -20,7 +21,7 @@ export type Buns3FileResult<TFile> = Promise<
 export type Buns3BucketResult = Promise<
   | {
       success: true;
-      bucket: Bucket;
+      bucket: BucketWithCount;
     }
   | {
       success: false;
@@ -31,7 +32,7 @@ export type Buns3BucketResult = Promise<
 export type Buns3BucketListResult = Promise<
   | {
       success: true;
-      buckets: Bucket[];
+      buckets: BucketWithCount[];
     }
   | {
       success: false;

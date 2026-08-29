@@ -13,7 +13,9 @@ function resolve(bucket: string) {
 
 export const bucketStorage: Buns3BucketStorage = {
   async get(bucket) {
-    const existingBucket = await db.orm.Bucket.first({
+    const existingBucket = await db.orm.Bucket.include("objects", (o) =>
+      o.count(),
+    ).first({
       name: bucket,
     });
 
@@ -45,7 +47,9 @@ export const bucketStorage: Buns3BucketStorage = {
     try {
       const bucketPath = resolve(bucket);
       const newBucket = await db.transaction(async (tx) => {
-        const created = await tx.orm.Bucket.create({ name: bucket });
+        const created = await tx.orm.Bucket.include("objects", (o) =>
+          o.count(),
+        ).create({ name: bucket });
 
         await mkdir(bucketPath, { recursive: true });
         return created;
@@ -95,7 +99,9 @@ export const bucketStorage: Buns3BucketStorage = {
     const bucketPath = resolve(bucket);
     let deleted;
     try {
-      deleted = await db.orm.Bucket.where({ name: bucket }).delete();
+      deleted = await db.orm.Bucket.include("objects", (o) => o.count())
+        .where({ name: bucket })
+        .delete();
       if (!deleted) {
         return {
           success: false,
@@ -130,7 +136,9 @@ export const bucketStorage: Buns3BucketStorage = {
   },
 
   async head(bucket) {
-    const existingBucket = await db.orm.Bucket.first({
+    const existingBucket = await db.orm.Bucket.include("objects", (o) =>
+      o.count(),
+    ).first({
       name: bucket,
     });
 
@@ -148,7 +156,9 @@ export const bucketStorage: Buns3BucketStorage = {
   },
 
   async list() {
-    const buckets = await db.orm.Bucket.all();
+    const buckets = await db.orm.Bucket.include("objects", (o) =>
+      o.count(),
+    ).all();
     return {
       success: true,
       buckets,
