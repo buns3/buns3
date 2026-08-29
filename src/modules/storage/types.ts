@@ -1,8 +1,13 @@
 import type { DefaultModelRow } from "@prisma/orm-sqlite/orm-client";
 import type { Buns3ErrorCode } from "$/lib/error-codes";
 import type { Contract } from "../prisma/contract";
+import type { BucketUpdate } from "../validation/bucket";
 
-export type Bucket = DefaultModelRow<Contract, "Bucket">;
+export type BucketRow = DefaultModelRow<Contract, "Bucket">;
+export type BucketRowWithCount = DefaultModelRow<Contract, "Bucket"> & {
+  objects: number;
+};
+export type Bucket = Omit<BucketRow, "publicRead"> & { publicRead: boolean };
 export type BucketWithCount = Bucket & { objects: number };
 export type StorageObject = DefaultModelRow<Contract, "Object">;
 
@@ -61,6 +66,8 @@ export interface Buns3BucketStorage {
   get(bucket: string): Buns3BucketResult;
 
   create(bucket: string): Buns3BucketResult;
+
+  update(bucket: string, opts?: BucketUpdate): Buns3BucketResult;
 
   delete(bucket: string): Buns3BucketResult;
 

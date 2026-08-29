@@ -1,0 +1,43 @@
+[
+  {
+    "id": "column.buckets.public_read",
+    "label": "Add column public_read on buckets",
+    "summary": "Adds column public_read on buckets",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "column",
+        "name": "public_read",
+        "table": "buckets"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"public_read\" is missing",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM pragma_table_info(?) WHERE \"name\" = ?",
+        "params": [
+          "buckets",
+          "public_read"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"public_read\"",
+        "sql": "ALTER TABLE \"buckets\" ADD COLUMN \"public_read\" INTEGER DEFAULT 0 NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"public_read\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM pragma_table_info(?) WHERE \"name\" = ?",
+        "params": [
+          "buckets",
+          "public_read"
+        ]
+      }
+    ]
+  }
+]

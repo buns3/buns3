@@ -9,7 +9,7 @@ import { CreateApiKey } from "../validation/api-key";
 import { apiKeyStorage } from "../api-keys/api-key-storage";
 import { type } from "arktype";
 import { bucketStorage } from "../storage/bucket";
-import { BucketName } from "../validation/bucket";
+import { BucketName, BucketUpdate } from "../validation/bucket";
 import openapi from "@elysia/openapi";
 
 export async function initServer() {
@@ -141,6 +141,24 @@ export async function initServer() {
           set.headers["location"] = `/${name}`;
           return status(201, { bucket });
         })
+        .patch(
+          "/buckets/:name",
+          { auth: "admin" },
+          async ({ params, body }) => {
+            const name = BucketName(params.name);
+            if (name instanceof type.errors) {
+              throw new Buns3ValidationError(name);
+            }
+
+            const input = BucketUpdate(body);
+            if (input instanceof type.errors) {
+              throw new Buns3ValidationError(input);
+            }
+
+            const { bucket } = unwrap(await bucketStorage.update(name, input));
+            return status(200, { bucket });
+          },
+        )
         .delete("/buckets/:name", { auth: "admin" }, async ({ params }) => {
           const name = BucketName(params.name);
           if (name instanceof type.errors) {

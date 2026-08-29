@@ -163,6 +163,13 @@
                   "codecId": "sqlite/text@1",
                   "kind": "scalar"
                 }
+              },
+              "publicRead": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sqlite/integer@1",
+                  "kind": "scalar"
+                }
               }
             },
             "relations": {
@@ -204,6 +211,9 @@
                 },
                 "name": {
                   "column": "name"
+                },
+                "publicRead": {
+                  "column": "public_read"
                 }
               },
               "namespaceId": "__unbound__",
@@ -413,6 +423,15 @@
                   "codecId": "sqlite/text@1",
                   "nativeType": "text",
                   "nullable": false
+                },
+                "public_read": {
+                  "codecId": "sqlite/integer@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "integer",
+                  "nullable": false
                 }
               },
               "foreignKeys": [],
@@ -506,7 +525,7 @@
         "id": "__unbound__"
       }
     },
-    "storageHash": "b9a634d0340f9264d69d21e2a89b6ef0cfe15767217f9419b637806e719a547e"
+    "storageHash": "a0d4ead53b02e728e574deee7a5706de655cad9a1f4764bb8932c12c7a40db58"
   },
   "capabilities": {
     "sql": {

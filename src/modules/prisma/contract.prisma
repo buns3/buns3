@@ -1,6 +1,7 @@
 model Bucket {
-  name      String   @id
-  createdAt DateTime @map("created_at")
+  name       String   @id
+  publicRead Int      @default(0) @map("public_read")
+  createdAt  DateTime @map("created_at")
 
   objects Object[]
   apiKeys ApiKey[]

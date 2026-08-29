@@ -3,9 +3,9 @@ import type { Buns3BucketStorage } from "./types";
 import { BASE_PATH } from "./constants";
 import { db } from "../prisma/db";
 import { mkdir } from "node:fs/promises";
-import { isErrnoException, isFkViolation, isUniqueViolation } from "./errors";
-import { unlink } from "node:fs/promises";
+import { isFkViolation, isUniqueViolation } from "./errors";
 import { rmdir } from "node:fs/promises";
+import { toBucketWithCount } from "./mapping";
 
 function resolve(bucket: string) {
   return path.resolve(BASE_PATH, bucket);
@@ -28,7 +28,7 @@ export const bucketStorage: Buns3BucketStorage = {
 
     return {
       success: true,
-      bucket: existingBucket,
+      bucket: toBucketWithCount(existingBucket),
     };
   },
 
@@ -57,7 +57,7 @@ export const bucketStorage: Buns3BucketStorage = {
 
       return {
         success: true,
-        bucket: newBucket,
+        bucket: toBucketWithCount(newBucket),
       };
     } catch (err) {
       if (isUniqueViolation(err, "buckets.name")) {
@@ -73,6 +73,31 @@ export const bucketStorage: Buns3BucketStorage = {
         code: "UNKNOWN",
       };
     }
+  },
+
+  async update(bucket, opts = {}) {
+    const updated = await db.orm.Bucket.include("objects", (o) => o.count())
+      .where({ name: bucket })
+      .update({
+        publicRead:
+          typeof opts.publicRead === "boolean"
+            ? opts.publicRead
+              ? 1
+              : 0
+            : undefined,
+      });
+
+    if (updated === null) {
+      return {
+        success: false,
+        code: "BUCKET_NOT_FOUND",
+      };
+    }
+
+    return {
+      success: true,
+      bucket: toBucketWithCount(updated),
+    };
   },
 
   async delete(bucket) {
@@ -131,7 +156,7 @@ export const bucketStorage: Buns3BucketStorage = {
 
     return {
       success: true,
-      bucket: deleted,
+      bucket: toBucketWithCount(deleted),
     };
   },
 
@@ -151,7 +176,7 @@ export const bucketStorage: Buns3BucketStorage = {
 
     return {
       success: true,
-      bucket: existingBucket,
+      bucket: toBucketWithCount(existingBucket),
     };
   },
 
@@ -161,7 +186,7 @@ export const bucketStorage: Buns3BucketStorage = {
     ).all();
     return {
       success: true,
-      buckets,
+      buckets: buckets.map(toBucketWithCount),
     };
   },
 };
