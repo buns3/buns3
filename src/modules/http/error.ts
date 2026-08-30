@@ -5,7 +5,6 @@ import Elysia, {
   NotFound,
   ParseError,
   problem,
-  status,
   ValidationError,
 } from "elysia";
 
@@ -20,6 +19,7 @@ export const ERROR_STATUS = {
   INVALID_API_KEY: 401,
   KEY_NOT_CAPABLE: 403,
   KEY_SCOPE_MISMATCH: 403,
+  PRESIGNED_EXPIRED: 401,
   UNKNOWN: 500,
 } as const satisfies Record<Buns3AnyErrorCode, number>;
 

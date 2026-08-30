@@ -6,6 +6,7 @@ import { ApiKeyToken } from "../validation/api-key";
 import { TOKEN_PREFIX } from "./constants";
 import { toApiKey } from "./mapping";
 import type { Buns3ApiKeyStorage } from "./types";
+import { deriveKeyId, verify } from "$/lib/presign";
 
 function hashToken(token: string) {
   return new Bun.CryptoHasher("sha256").update(token).digest("hex");
@@ -24,6 +25,56 @@ export const apiKeyStorage: Buns3ApiKeyStorage = {
     const providedHash = hashToken(token);
     const apiKey = await db.orm.ApiKey.where({
       tokenHash: providedHash,
+    }).update({
+      lastUsedAt: new Date(),
+    });
+
+    if (apiKey === null) {
+      return {
+        success: false,
+        code: "INVALID_API_KEY",
+      };
+    }
+
+    return {
+      success: true,
+      data: toApiKey(apiKey),
+    };
+  },
+
+  async verifyPresigned(opts) {
+    const { keyId, ...rest } = opts;
+
+    // O(n) scan, keyId isn't stored, maybe add an indexed derived column if key count ever matters...
+    const rows = await db.orm.ApiKey.all();
+    const row = rows.find((k) => deriveKeyId(k.tokenHash) === opts.keyId);
+    if (!row) {
+      return {
+        success: false,
+        code: "INVALID_API_KEY",
+      };
+    }
+
+    const verifyResult = verify({ tokenHash: row.tokenHash, ...rest });
+    if (!verifyResult.valid) {
+      switch (verifyResult.reason) {
+        case "expired":
+          return {
+            success: false,
+            code: "PRESIGNED_EXPIRED",
+          };
+
+        case "mismatch":
+        default:
+          return {
+            success: false,
+            code: "INVALID_API_KEY",
+          };
+      }
+    }
+
+    const apiKey = await db.orm.ApiKey.where({
+      id: row.id,
     }).update({
       lastUsedAt: new Date(),
     });

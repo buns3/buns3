@@ -98,8 +98,8 @@ export async function initServer() {
     )
 
     // whoami route
-    .get("/_admin/whoami", { auth: true }, ({ apiKey }) => {
-      return { apiKey };
+    .get("/_admin/whoami", { auth: true }, ({ authState }) => {
+      return { apiKey: authState.kind === "key" ? authState.apiKey : null };
     })
 
     // rest of admin routes

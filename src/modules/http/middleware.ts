@@ -1,11 +1,12 @@
-import Elysia, { NotFound, t } from "elysia";
+import Elysia, { NotFound, t, type Context } from "elysia";
 import { apiKeyStorage } from "../api-keys/api-key-storage";
-import { Buns3ValidationError, unwrap } from "$/lib/error";
+import { Buns3Error, Buns3ValidationError, unwrap } from "$/lib/error";
 import { Key } from "../validation/object";
 import { type } from "arktype";
 import { BucketName } from "../validation/bucket";
 import type { ApiKey } from "../api-keys/types";
 import { authorize, resolveCredentials } from "../auth/authorize";
+import type { AuthState } from "../auth/types";
 
 export const useBucketKey = new Elysia({ name: "bucketKey" }).macro({
   bucketKey: {
@@ -34,25 +35,60 @@ export const useAuth = new Elysia({
   name: "useAuth",
 }).macro({
   auth: (capability?: "read" | "write" | "admin" | true) => ({
-    derive: async ({ headers }) => {
-      const { credentials } = unwrap(resolveCredentials(headers.authorization));
-      let apiKey: ApiKey | null = null;
-      if (credentials.kind === "bearer") {
-        apiKey = unwrap(await apiKeyStorage.verify(credentials.token)).data;
+    derive: async ({ headers, query }) => {
+      const { credentials } = unwrap(
+        resolveCredentials(headers.authorization, query),
+      );
+
+      let authState: AuthState;
+      switch (credentials.kind) {
+        case "anonymous":
+          authState = { kind: "anonymous" };
+          break;
+
+        case "presign":
+          authState = { kind: "presign", params: credentials.params };
+          break;
+
+        case "bearer":
+          authState = {
+            kind: "key",
+            apiKey: unwrap(await apiKeyStorage.verify(credentials.token)).data,
+          };
+          break;
+
+        default:
+          throw new Buns3Error("INVALID_API_KEY");
       }
 
-      return { apiKey };
+      return { authState };
     },
 
     beforeHandle: async ({
-      apiKey,
+      authState,
       params,
+      request,
+      bucket,
+      key,
     }: {
       // typed by hand: our own derive above guarantees this at runtime
-      apiKey: ApiKey | null;
+      // params re-declared optional, Elysia's Context claims it's always present
+      // but it's undefined for param-less routes.
+      authState: AuthState;
       params?: Record<string, string>;
-    }) => {
-      unwrap(await authorize({ apiKey, capability, bucket: params?.bucket }));
+      // from the bucketKey derive on data routes. validated + decoded
+      bucket?: string;
+      key?: string;
+    } & Omit<Context, "params">) => {
+      unwrap(
+        await authorize({
+          state: authState,
+          capability,
+          method: request.method,
+          bucket: bucket ?? params?.bucket,
+          key,
+        }),
+      );
     },
   }),
 });

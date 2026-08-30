@@ -24,5 +24,15 @@ export const VALIDATION_ERROR_CODES = ["VALIDATION_ERROR"] as const;
 
 export type Buns3ValidationErrorCode = (typeof VALIDATION_ERROR_CODES)[number];
 
+export const PRESIGN_ERROR_CODES = [
+  "INVALID_API_KEY",
+  "PRESIGNED_EXPIRED",
+] as const;
+
+export type Buns3PresignErrorCode = (typeof PRESIGN_ERROR_CODES)[number];
+
 export type Buns3AnyErrorCode =
-  Buns3ErrorCode | Buns3ApiKeyErrorCode | Buns3ValidationErrorCode;
+  | Buns3ErrorCode
+  | Buns3ApiKeyErrorCode
+  | Buns3ValidationErrorCode
+  | Buns3PresignErrorCode;

@@ -1,15 +1,28 @@
+import { type } from "arktype";
 import type { ApiKey } from "../api-keys/types";
 import { bucketStorage } from "../storage/bucket";
+import { PresignParams } from "../validation/presign";
 import type {
   AuthorizeCapability,
   AuthorizeOptions,
   AuthorizeResult,
   ResolvedCredentialsResult,
 } from "./types";
+import { isPresignMethod } from "$/lib/presign";
+import { apiKeyStorage } from "../api-keys/api-key-storage";
+
+const PRESIGN_PARAM_KEYS = PresignParams.props.map((p) => p.key);
 
 export function resolveCredentials(
   authorization?: string,
+  query?: Record<string, string | undefined>,
 ): ResolvedCredentialsResult {
+  const isPresign = query && PRESIGN_PARAM_KEYS.some((k) => k in query);
+
+  if (isPresign) {
+    return resolvePresignCredentials(authorization, query);
+  }
+
   if (!authorization) {
     return {
       success: true,
@@ -32,32 +45,63 @@ export function resolveCredentials(
   };
 }
 
-export async function authorize(
-  opts: AuthorizeOptions,
-): Promise<AuthorizeResult> {
-  const { apiKey, bucket, capability } = opts;
-
-  if (apiKey === null) {
-    return authorizeAnonymous(capability, bucket);
-  }
-
-  if (!hasCapability(apiKey, capability)) {
+function resolvePresignCredentials(
+  authorization?: string,
+  query?: Record<string, string | undefined>,
+): ResolvedCredentialsResult {
+  if (authorization) {
     return {
       success: false,
-      code: "KEY_NOT_CAPABLE",
+      code: "INVALID_API_KEY",
     };
   }
 
-  if (!inScope(apiKey, bucket)) {
+  const presignParams = PresignParams({
+    keyId: query?.keyId,
+    expires: query?.expires,
+    sig: query?.sig,
+  });
+
+  if (presignParams instanceof type.errors) {
     return {
       success: false,
-      code: "KEY_SCOPE_MISMATCH",
+      code: "INVALID_API_KEY",
     };
   }
 
   return {
     success: true,
+    credentials: { kind: "presign", params: presignParams },
   };
+}
+
+export async function authorize(
+  opts: AuthorizeOptions,
+): Promise<AuthorizeResult> {
+  const { state, bucket, capability, method, key } = opts;
+
+  switch (state.kind) {
+    case "anonymous":
+      return authorizeAnonymous(capability, bucket);
+
+    case "presign": {
+      return authorizePresign(state.params, {
+        capability,
+        bucket,
+        key,
+        method,
+      });
+    }
+
+    case "key":
+      return authorizeKey(state.apiKey, capability, bucket);
+
+    default:
+      return {
+        success: false,
+        code: "INVALID_API_KEY",
+      };
+  }
 }
 
 async function authorizeAnonymous(
@@ -76,6 +120,60 @@ async function authorizeAnonymous(
     return {
       success: false,
       code: "INVALID_API_KEY",
+    };
+  }
+
+  return {
+    success: true,
+  };
+}
+
+async function authorizePresign(
+  params: PresignParams,
+  opts: {
+    capability?: AuthorizeCapability;
+    bucket?: string;
+    key?: string;
+    method: string;
+  },
+): Promise<AuthorizeResult> {
+  const { capability, bucket, key, method } = opts;
+
+  if (!bucket || !key || !isPresignMethod(method)) {
+    return { success: false, code: "INVALID_API_KEY" };
+  }
+
+  const result = await apiKeyStorage.verifyPresigned({
+    ...params,
+    method,
+    bucket,
+    key,
+    now: Math.floor(Date.now() / 1000), // milliseconds -> unix seconds
+  });
+
+  if (!result.success) {
+    return result;
+  }
+
+  return authorizeKey(result.data, capability, bucket);
+}
+
+function authorizeKey(
+  apiKey: ApiKey,
+  capability?: AuthorizeCapability,
+  bucket?: string,
+): AuthorizeResult {
+  if (!hasCapability(apiKey, capability)) {
+    return {
+      success: false,
+      code: "KEY_NOT_CAPABLE",
+    };
+  }
+
+  if (!inScope(apiKey, bucket)) {
+    return {
+      success: false,
+      code: "KEY_SCOPE_MISMATCH",
     };
   }
 
