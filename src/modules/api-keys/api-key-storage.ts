@@ -6,11 +6,7 @@ import { ApiKeyToken } from "../validation/api-key";
 import { TOKEN_PREFIX } from "./constants";
 import { toApiKey } from "./mapping";
 import type { Buns3ApiKeyStorage } from "./types";
-import { deriveKeyId, verify } from "$/lib/presign";
-
-function hashToken(token: string) {
-  return new Bun.CryptoHasher("sha256").update(token).digest("hex");
-}
+import { deriveKeyId, hashToken, verify } from "$/lib/presign";
 
 export const apiKeyStorage: Buns3ApiKeyStorage = {
   async verify(token) {

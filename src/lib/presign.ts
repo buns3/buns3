@@ -24,6 +24,10 @@ export type VerifyOptions = CanonicalStringOptions & {
   now: number;
 };
 
+export function hashToken(token: string) {
+  return new Bun.CryptoHasher("sha256").update(token).digest("hex");
+}
+
 export function isPresignMethod(method: string): method is PresignMethod {
   return (PRESIGN_METHODS as readonly string[]).includes(method);
 }
