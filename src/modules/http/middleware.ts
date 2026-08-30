@@ -1,11 +1,11 @@
 import Elysia, { NotFound, t } from "elysia";
 import { apiKeyStorage } from "../api-keys/api-key-storage";
-import { Buns3Error, Buns3ValidationError, unwrap } from "$/lib/error";
+import { Buns3ValidationError, unwrap } from "$/lib/error";
 import { Key } from "../validation/object";
 import { type } from "arktype";
 import { BucketName } from "../validation/bucket";
 import type { ApiKey } from "../api-keys/types";
-import { bucketStorage } from "../storage/bucket";
+import { authorize, resolveCredentials } from "../auth/authorize";
 
 export const useBucketKey = new Elysia({ name: "bucketKey" }).macro({
   bucketKey: {
@@ -35,60 +35,24 @@ export const useAuth = new Elysia({
 }).macro({
   auth: (capability?: "read" | "write" | "admin" | true) => ({
     derive: async ({ headers }) => {
-      const rawToken = headers.authorization;
-      if (!rawToken) {
-        return {
-          apiKey: null as ApiKey | null,
-        };
+      const { credentials } = unwrap(resolveCredentials(headers.authorization));
+      let apiKey: ApiKey | null = null;
+      if (credentials.kind === "bearer") {
+        apiKey = unwrap(await apiKeyStorage.verify(credentials.token)).data;
       }
 
-      if (!rawToken.toLowerCase().startsWith("bearer ")) {
-        throw new Buns3Error("INVALID_API_KEY");
-      }
-
-      const token = rawToken.slice(7);
-      const { data: apiKey } = unwrap(await apiKeyStorage.verify(token));
-
-      return {
-        apiKey,
-      };
+      return { apiKey };
     },
 
-    beforeHandle: async (ctx) => {
+    beforeHandle: async ({
+      apiKey,
+      params,
+    }: {
       // typed by hand: our own derive above guarantees this at runtime
-      const { apiKey, params } = ctx as typeof ctx & { apiKey: ApiKey | null };
-
-      if (apiKey === null) {
-        if (!params?.bucket || capability !== "read")
-          throw new Buns3Error("INVALID_API_KEY");
-
-        const bucketResult = await bucketStorage.get(params.bucket);
-        if (!bucketResult.success) {
-          throw new Buns3Error("INVALID_API_KEY");
-        }
-
-        if (!bucketResult.bucket.publicRead) {
-          throw new Buns3Error("INVALID_API_KEY");
-        }
-      } else {
-        if (typeof capability === "string") {
-          const isCapable = {
-            read: apiKey.canRead,
-            write: apiKey.canWrite,
-            admin: apiKey.isAdmin,
-          }[capability];
-
-          if (!isCapable) throw new Buns3Error("KEY_NOT_CAPABLE");
-        }
-
-        if (
-          apiKey.bucketName &&
-          params?.bucket &&
-          apiKey.bucketName !== params.bucket
-        ) {
-          throw new Buns3Error("KEY_SCOPE_MISMATCH");
-        }
-      }
+      apiKey: ApiKey | null;
+      params?: Record<string, string>;
+    }) => {
+      unwrap(await authorize({ apiKey, capability, bucket: params?.bucket }));
     },
   }),
 });
