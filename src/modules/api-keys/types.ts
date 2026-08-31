@@ -58,7 +58,7 @@ export interface Buns3ApiKeyStorage {
     input: CreateApiKey,
   ): Buns3ApiKeyResult<{ apiKey: ApiKey; token: string }>;
 
-  delete(): Buns3ApiKeyResult<ApiKey>;
+  delete(id: string): Buns3ApiKeyResult<ApiKey>;
 
-  list(): Buns3ApiKeyResult<ApiKey[]>;
+  getAll(): Buns3ApiKeyResult<ApiKey[]>;
 }

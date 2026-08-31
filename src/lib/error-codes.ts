@@ -13,8 +13,9 @@ export type Buns3ErrorCode = (typeof ERROR_CODES)[number];
 export const API_KEY_ERROR_CODES = [
   "INVALID_API_KEY",
   "BUCKET_NOT_FOUND",
-  "KEY_NOT_CAPABLE",
-  "KEY_SCOPE_MISMATCH",
+  "API_KEY_NOT_CAPABLE",
+  "API_KEY_SCOPE_MISMATCH",
+  "API_KEY_NOT_FOUND",
   "UNKNOWN",
 ] as const;
 

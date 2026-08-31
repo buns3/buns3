@@ -166,14 +166,14 @@ function authorizeKey(
   if (!hasCapability(apiKey, capability)) {
     return {
       success: false,
-      code: "KEY_NOT_CAPABLE",
+      code: "API_KEY_NOT_CAPABLE",
     };
   }
 
   if (!inScope(apiKey, bucket)) {
     return {
       success: false,
-      code: "KEY_SCOPE_MISMATCH",
+      code: "API_KEY_SCOPE_MISMATCH",
     };
   }
 

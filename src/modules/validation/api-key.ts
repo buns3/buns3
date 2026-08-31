@@ -6,6 +6,8 @@ export const ApiKeyToken = type(
   new RegExp(`^${TOKEN_PREFIX}[A-Za-z0-9_-]{43}$`),
 );
 
+export const ApiKeyId = type("string.uuid");
+
 export const CreateAdminApiKey = type({
   name: "0 < string <= 50",
   bucketName: "null",

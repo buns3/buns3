@@ -146,17 +146,29 @@ export const apiKeyStorage: Buns3ApiKeyStorage = {
     }
   },
 
-  async delete() {
+  async delete(id) {
+    const deletedKey = await db.orm.ApiKey.where({ id }).delete();
+    if (!deletedKey) {
+      return {
+        success: false,
+        code: "API_KEY_NOT_FOUND",
+      };
+    }
+
     return {
-      success: false,
-      code: "UNKNOWN",
+      success: true,
+      data: toApiKey(deletedKey),
     };
   },
 
-  async list() {
+  async getAll() {
+    const apiKeys = await db.orm.ApiKey.orderBy((key) =>
+      key.createdAt.asc(),
+    ).all();
+
     return {
-      success: false,
-      code: "UNKNOWN",
+      success: true,
+      data: apiKeys.map(toApiKey),
     };
   },
 };
