@@ -18,7 +18,7 @@ export const apiKeyRoutes = new Elysia({
 
   .group("/keys", { auth: "admin" }, (group) =>
     group
-      .get("", { auth: "admin" }, async () => {
+      .get("", async () => {
         const { data } = unwrap(await apiKeyStorage.getAll());
         return { apiKeys: data };
       })
@@ -33,7 +33,7 @@ export const apiKeyRoutes = new Elysia({
         return status(201, data);
       })
 
-      .delete("/:id", { auth: "admin" }, async ({ params }) => {
+      .delete("/:id", async ({ params }) => {
         const keyId = ApiKeyId(params.id);
         if (keyId instanceof type.errors) {
           throw new Buns3ValidationError(keyId);
