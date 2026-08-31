@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>buns3 admin</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- pin Babel 7: v8's react preset defaults to the automatic JSX runtime, which emits
+       import statements that cannot run in a classic script tag -->
+  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+  <script>
+    // set theme before styles paint (no flash); stored choice wins over OS preference
+    try {
+      document.documentElement.dataset.theme =
+        localStorage.getItem("buns3.theme") ??
+        (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    } catch { document.documentElement.dataset.theme = "dark"; }
+  </script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #14161a; --panel: #1c1f25; --text: #d7dae0; --muted: #8b93a1;
+      --border: #2a2e36; --border-strong: #3a404b; --divider: #22262d;
+      --accent: #e8a33d; --accent-text: #14161a; --ok: #5fb26a; --err: #d05f5f;
+      --btn: #262b33; --token-bg: #241f14; --pre: #aeb6c2;
+    }
+    :root[data-theme="light"] {
+      color-scheme: light;
+      --bg: #f6f5f2; --panel: #ffffff; --text: #23272e; --muted: #64707d;
+      --border: #d8dbe0; --border-strong: #b8bec7; --divider: #e7e9ec;
+      --accent: #a56a10; --accent-text: #ffffff; --ok: #25823a; --err: #b8433c;
+      --btn: #eceef1; --token-bg: #fbf1da; --pre: #4b5563;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace; }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+    .titlebar { display: flex; justify-content: space-between; align-items: baseline; }
+    h1 { font-size: 18px; margin: 0 0 4px; } h1 span { color: var(--accent); }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 28px 0 8px; }
+    .sub { color: var(--muted); margin: 0 0 20px; }
+    fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin: 0 0 12px; }
+    label { display: block; color: var(--muted); font-size: 12px; margin: 8px 0 2px; }
+    input[type=text], input[type=password], select { width: 100%; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; font: inherit; }
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+    input:disabled { opacity: 0.4; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; } .row > div { flex: 1; min-width: 140px; }
+    button { background: var(--btn); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; padding: 7px 14px; font: inherit; cursor: pointer; margin: 10px 8px 0 0; }
+    button:hover { border-color: var(--accent); } button:disabled { opacity: 0.4; cursor: default; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+    button.danger:hover { border-color: var(--err); color: var(--err); }
+    button.small { padding: 3px 10px; margin: 0 4px 0 0; font-size: 12px; }
+    .check { display: inline-flex; align-items: center; gap: 6px; margin: 10px 16px 0 0; color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+    th { text-align: left; color: var(--muted); font-size: 12px; font-weight: normal; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+    td { padding: 6px 8px; border-bottom: 1px solid var(--divider); }
+    .on { color: var(--ok); } .off { color: var(--muted); }
+    .token-box { border: 1px solid var(--accent); border-radius: 6px; background: var(--token-bg); padding: 10px 12px; margin-top: 12px; word-break: break-all; }
+    .token-box .warn { color: var(--accent); font-size: 12px; display: block; margin-bottom: 6px; }
+    .log { display: flex; flex-direction: column; gap: 8px; }
+    .entry { border: 1px solid var(--border); border-left-width: 4px; border-radius: 6px; padding: 8px 12px; background: var(--panel); }
+    .entry.ok { border-left-color: var(--ok); } .entry.err { border-left-color: var(--err); }
+    .entry .head { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+    .entry .status { font-weight: 700; } .ok .status { color: var(--ok); } .err .status { color: var(--err); }
+    .entry .meta { color: var(--muted); font-size: 12px; }
+    .entry pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-all; color: var(--pre); font-size: 12px; max-height: 200px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-presets="react">
+    const { useState, useCallback } = React;
+
+    const store = {
+      get: (k, fallback) => { try { return localStorage.getItem(k) ?? fallback; } catch { return fallback; } },
+      set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+    };
+
+    function App() {
+      const [base, setBase] = useState(store.get("buns3.base", location.origin.startsWith("http") ? location.origin : "http://localhost:8000"));
+      const [token, setToken] = useState(store.get("buns3.adminToken", ""));
+      const [busy, setBusy] = useState(false);
+      const [log, setLog] = useState([]);
+      const [buckets, setBuckets] = useState(null);
+      const [newBucket, setNewBucket] = useState("");
+      const [keyForm, setKeyForm] = useState({ name: "", kind: "data", bucketName: "", canRead: true, canWrite: false });
+      const [mintedToken, setMintedToken] = useState(null);
+      const [copied, setCopied] = useState(false);
+
+      const persist = (setter, storeKey) => (e) => { setter(e.target.value); store.set(storeKey, e.target.value); };
+      const api = (path) => `${base.replace(/\/$/, "")}${path}`;
+
+      const run = useCallback(async (method, path, body) => {
+        setBusy(true);
+        const started = performance.now();
+        let entry, json = null;
+        try {
+          const resp = await fetch(api(path), {
+            method,
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+            },
+            body: body !== undefined ? JSON.stringify(body) : undefined,
+          });
+          const ms = Math.round(performance.now() - started);
+          const text = method === "HEAD" ? "" : await resp.text();
+          try { json = text ? JSON.parse(text) : null; } catch {}
+          entry = { ok: resp.ok, status: `${resp.status} ${resp.statusText}`, method, path, ms, body: text.length > 1500 ? text.slice(0, 1500) + "…" : text };
+        } catch (err) {
+          entry = { ok: false, status: "network error", method, path, ms: Math.round(performance.now() - started), body: String(err) };
+        }
+        setLog((l) => [{ id: Date.now() + Math.random(), ...entry }, ...l]);
+        setBusy(false);
+        return { ok: entry.ok, json };
+      }, [base, token]);
+
+      async function refreshBuckets() {
+        const { ok, json } = await run("GET", "/_admin/buckets");
+        setBuckets(ok ? json.buckets : null);
+      }
+
+      async function createBucket() {
+        if (!newBucket) return;
+        const { ok } = await run("PUT", `/_admin/buckets/${newBucket}`);
+        if (ok) { setNewBucket(""); refreshBuckets(); }
+      }
+
+      async function togglePublic(b) {
+        const { ok } = await run("PATCH", `/_admin/buckets/${b.name}`, { publicRead: !b.publicRead });
+        if (ok) refreshBuckets();
+      }
+
+      async function deleteBucket(b) {
+        if (!confirm(`DELETE bucket "${b.name}"? (refused if non-empty; scoped keys cascade away)`)) return;
+        const { ok } = await run("DELETE", `/_admin/buckets/${b.name}`);
+        if (ok) refreshBuckets();
+      }
+
+      async function mintKey() {
+        const isAdmin = keyForm.kind === "admin";
+        const payload = isAdmin
+          ? { name: keyForm.name, bucketName: null, canRead: false, canWrite: false, isAdmin: true }
+          : { name: keyForm.name, bucketName: keyForm.bucketName, canRead: keyForm.canRead, canWrite: keyForm.canWrite, isAdmin: false };
+        const { ok, json } = await run("POST", "/_admin/keys", payload);
+        if (ok) { setMintedToken(json.token); setCopied(false); }
+      }
+
+      async function copyToken() {
+        try { await navigator.clipboard.writeText(mintedToken); setCopied(true); } catch {}
+      }
+
+      const kf = (patch) => setKeyForm((f) => ({ ...f, ...patch }));
+
+      const [theme, setTheme] = useState(document.documentElement.dataset.theme);
+      function toggleTheme() {
+        const next = theme === "light" ? "dark" : "light";
+        document.documentElement.dataset.theme = next;
+        try { localStorage.setItem("buns3.theme", next); } catch {}
+        setTheme(next);
+      }
+
+      return (
+        <div className="wrap">
+          <div className="titlebar">
+            <h1><span>buns3</span> admin</h1>
+            <button className="small" onClick={toggleTheme}>{theme === "light" ? "☾ dark" : "☀ light"}</button>
+          </div>
+          <p className="sub">control plane only — needs an admin token (data-plane testing lives in the upload tester)</p>
+
+          <h2>Connection</h2>
+          <fieldset>
+            <div className="row">
+              <div><label>server</label><input type="text" value={base} onChange={persist(setBase, "buns3.base")} /></div>
+              <div><label>admin token (stored in localStorage)</label><input type="password" value={token} onChange={persist(setToken, "buns3.adminToken")} placeholder="buns3_…" /></div>
+            </div>
+            <button disabled={busy} onClick={() => run("GET", "/_admin/whoami")}>whoami</button>
+          </fieldset>
+
+          <h2>Buckets</h2>
+          <fieldset>
+            <button className="primary" disabled={busy} onClick={refreshBuckets}>refresh list</button>
+            {buckets && (
+              <table>
+                <thead><tr><th>name</th><th>objects</th><th>publicRead</th><th>createdAt</th><th></th></tr></thead>
+                <tbody>
+                  {buckets.map((b) => (
+                    <tr key={b.name}>
+                      <td>{b.name}</td>
+                      <td>{b.objects}</td>
+                      <td className={b.publicRead ? "on" : "off"}>{String(b.publicRead)}</td>
+                      <td className="off">{new Date(b.createdAt).toISOString().slice(0, 19)}Z</td>
+                      <td>
+                        <button className="small" disabled={busy} onClick={() => togglePublic(b)}>{b.publicRead ? "make private" : "make public"}</button>
+                        <button className="small danger" disabled={busy} onClick={() => deleteBucket(b)}>delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <div className="row">
+              <div><label>new bucket name</label><input type="text" value={newBucket} onChange={(e) => setNewBucket(e.target.value)} placeholder="lowercase, ≤20 chars" /></div>
+              <div><button disabled={busy || !newBucket} onClick={createBucket}>create</button></div>
+            </div>
+          </fieldset>
+
+          <h2>Mint API key</h2>
+          <fieldset>
+            <div className="row">
+              <div><label>name</label><input type="text" value={keyForm.name} onChange={(e) => kf({ name: e.target.value })} /></div>
+              <div>
+                <label>kind</label>
+                <select value={keyForm.kind} onChange={(e) => kf({ kind: e.target.value })}>
+                  <option value="data">bucket data key</option>
+                  <option value="admin">global admin key</option>
+                </select>
+              </div>
+              <div><label>bucket (data keys only)</label><input type="text" value={keyForm.bucketName} disabled={keyForm.kind === "admin"} onChange={(e) => kf({ bucketName: e.target.value })} /></div>
+            </div>
+            <label className="check"><input type="checkbox" checked={keyForm.canRead} disabled={keyForm.kind === "admin"} onChange={(e) => kf({ canRead: e.target.checked })} /> canRead</label>
+            <label className="check"><input type="checkbox" checked={keyForm.canWrite} disabled={keyForm.kind === "admin"} onChange={(e) => kf({ canWrite: e.target.checked })} /> canWrite</label>
+            <div>
+              <button className="primary" disabled={busy || !keyForm.name} onClick={mintKey}>mint</button>
+            </div>
+            {mintedToken && (
+              <div className="token-box">
+                <span className="warn">shown once — the server keeps only a hash. Save it now.</span>
+                {mintedToken}
+                <div><button className="small" onClick={copyToken}>{copied ? "copied ✓" : "copy"}</button></div>
+              </div>
+            )}
+          </fieldset>
+
+          <h2>Presign</h2>
+          <fieldset>
+            <p className="sub" style={{ margin: 0 }}>
+              coming later — presigning currently happens offline (<code>bun scripts/presign.ts</code>);
+              this section activates when the API can presign.
+            </p>
+          </fieldset>
+
+          <h2>Log</h2>
+          <div className="log">
+            {log.length === 0 && <p className="sub">nothing yet</p>}
+            {log.map((e) => (
+              <div key={e.id} className={"entry " + (e.ok ? "ok" : "err")}>
+                <div className="head">
+                  <span className="status">{e.status}</span>
+                  <span>{e.method} {e.path}</span>
+                  <span className="meta">{e.ms}ms</span>
+                </div>
+                {e.body && <pre>{e.body}</pre>}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

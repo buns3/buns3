@@ -9,31 +9,54 @@
   <!-- pin Babel 7: v8's react preset defaults to the automatic JSX runtime, which emits
        import statements that cannot run in a classic script tag -->
   <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+  <script>
+    // set theme before styles paint (no flash); stored choice wins over OS preference
+    try {
+      document.documentElement.dataset.theme =
+        localStorage.getItem("buns3.theme") ??
+        (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    } catch { document.documentElement.dataset.theme = "dark"; }
+  </script>
   <style>
-    :root { color-scheme: dark; }
+    :root {
+      color-scheme: dark;
+      --bg: #14161a; --panel: #1c1f25; --text: #d7dae0; --muted: #8b93a1;
+      --border: #2a2e36; --border-strong: #3a404b;
+      --accent: #e8a33d; --accent-text: #14161a; --ok: #5fb26a; --err: #d05f5f;
+      --btn: #262b33; --pre: #aeb6c2;
+    }
+    :root[data-theme="light"] {
+      color-scheme: light;
+      --bg: #f6f5f2; --panel: #ffffff; --text: #23272e; --muted: #64707d;
+      --border: #d8dbe0; --border-strong: #b8bec7;
+      --accent: #a56a10; --accent-text: #ffffff; --ok: #25823a; --err: #b8433c;
+      --btn: #eceef1; --pre: #4b5563;
+    }
     * { box-sizing: border-box; }
-    body { margin: 0; background: #14161a; color: #d7dae0; font: 14px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace; }
     .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
-    h1 { font-size: 18px; margin: 0 0 4px; } h1 span { color: #e8a33d; }
-    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: #8b93a1; margin: 28px 0 8px; }
-    .sub { color: #8b93a1; margin: 0 0 20px; }
-    fieldset { border: 1px solid #2a2e36; border-radius: 8px; padding: 12px 14px; margin: 0 0 12px; }
-    label { display: block; color: #8b93a1; font-size: 12px; margin: 8px 0 2px; }
-    input[type=text], input[type=password] { width: 100%; background: #1c1f25; color: #d7dae0; border: 1px solid #2a2e36; border-radius: 6px; padding: 7px 9px; font: inherit; }
-    input:focus { outline: none; border-color: #e8a33d; }
+    .titlebar { display: flex; justify-content: space-between; align-items: baseline; }
+    h1 { font-size: 18px; margin: 0 0 4px; } h1 span { color: var(--accent); }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 28px 0 8px; }
+    .sub { color: var(--muted); margin: 0 0 20px; }
+    fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin: 0 0 12px; }
+    label { display: block; color: var(--muted); font-size: 12px; margin: 8px 0 2px; }
+    input[type=text], input[type=password] { width: 100%; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; font: inherit; }
+    input:focus { outline: none; border-color: var(--accent); }
     .row { display: flex; gap: 10px; flex-wrap: wrap; } .row > div { flex: 1; min-width: 180px; }
-    button { background: #262b33; color: #d7dae0; border: 1px solid #3a404b; border-radius: 6px; padding: 7px 14px; font: inherit; cursor: pointer; margin: 10px 8px 0 0; }
-    button:hover { border-color: #e8a33d; } button:disabled { opacity: 0.4; cursor: default; }
-    button.primary { background: #e8a33d; border-color: #e8a33d; color: #14161a; font-weight: 600; }
-    .check { display: flex; align-items: center; gap: 6px; margin-top: 10px; color: #8b93a1; }
+    button { background: var(--btn); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; padding: 7px 14px; font: inherit; cursor: pointer; margin: 10px 8px 0 0; }
+    button:hover { border-color: var(--accent); } button:disabled { opacity: 0.4; cursor: default; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+    button.small { padding: 3px 10px; margin: 0; font-size: 12px; }
+    .check { display: flex; align-items: center; gap: 6px; margin-top: 10px; color: var(--muted); }
     .log { display: flex; flex-direction: column; gap: 8px; }
-    .entry { border: 1px solid #2a2e36; border-left-width: 4px; border-radius: 6px; padding: 8px 12px; background: #1c1f25; }
-    .entry.ok { border-left-color: #5fb26a; } .entry.err { border-left-color: #d05f5f; }
+    .entry { border: 1px solid var(--border); border-left-width: 4px; border-radius: 6px; padding: 8px 12px; background: var(--panel); }
+    .entry.ok { border-left-color: var(--ok); } .entry.err { border-left-color: var(--err); }
     .entry .head { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; }
-    .entry .status { font-weight: 700; } .ok .status { color: #5fb26a; } .err .status { color: #d05f5f; }
-    .entry .meta { color: #8b93a1; font-size: 12px; }
-    .entry pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-all; color: #aeb6c2; font-size: 12px; max-height: 200px; overflow: auto; }
-    .entry a { color: #e8a33d; }
+    .entry .status { font-weight: 700; } .ok .status { color: var(--ok); } .err .status { color: var(--err); }
+    .entry .meta { color: var(--muted); font-size: 12px; }
+    .entry pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-all; color: var(--pre); font-size: 12px; max-height: 200px; overflow: auto; }
+    .entry a { color: var(--accent); }
   </style>
 </head>
 <body>
@@ -114,9 +137,20 @@
 
       const keyOrFile = () => objectKey || fileRef.current?.files?.[0]?.name || "";
 
+      const [theme, setTheme] = useState(document.documentElement.dataset.theme);
+      function toggleTheme() {
+        const next = theme === "light" ? "dark" : "light";
+        document.documentElement.dataset.theme = next;
+        try { localStorage.setItem("buns3.theme", next); } catch {}
+        setTheme(next);
+      }
+
       return (
         <div className="wrap">
-          <h1><span>buns3</span> tester</h1>
+          <div className="titlebar">
+            <h1><span>buns3</span> tester</h1>
+            <button className="small" onClick={toggleTheme}>{theme === "light" ? "☾ dark" : "☀ light"}</button>
+          </div>
           <p className="sub">requests go to the server below; auth optional — uncheck nothing and clear the key to probe public-read</p>
 
           <h2>Connection</h2>
