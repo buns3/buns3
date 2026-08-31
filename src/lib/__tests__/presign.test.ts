@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  buildPresignedUrl,
   canonicalString,
   deriveKeyId,
   hashToken,
@@ -128,6 +129,41 @@ describe("hashToken", () => {
     expect(hashToken("hello")).toBe(
       "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
     );
+  });
+});
+
+describe("buildPresignedUrl", () => {
+  const params = { keyId: "a".repeat(64), expires: 1_800_000_000, sig: "b".repeat(64) };
+  const base = "http://localhost:8000";
+
+  test("plain key", () => {
+    expect(buildPresignedUrl(base, "dev", "hello.txt", params)).toBe(
+      `${base}/dev/hello.txt?keyId=${params.keyId}&expires=1800000000&sig=${params.sig}`,
+    );
+  });
+
+  test("slashes stay as segment separators (wildcard-matchable)", () => {
+    expect(buildPresignedUrl(base, "dev", "docs/deep/file.txt", params)).toContain(
+      "/dev/docs/deep/file.txt?",
+    );
+  });
+
+  test("literal percent is encoded, not decoded (the CLI crash case)", () => {
+    expect(buildPresignedUrl(base, "dev", "100%.txt", params)).toContain("/dev/100%25.txt?");
+  });
+
+  test("spaces, brackets, and query-breaking chars are encoded", () => {
+    const url = buildPresignedUrl(base, "dev", "my file [1]?.txt", params);
+    expect(url).toContain("/dev/my%20file%20%5B1%5D%3F.txt?");
+    // the ? in the key must not truncate into the query string
+    expect(new URL(url).pathname).toBe("/dev/my%20file%20%5B1%5D%3F.txt");
+  });
+
+  test("server-side decode round-trips to the signed key", () => {
+    const key = "påse 100% [x]/deep.txt";
+    const url = new URL(buildPresignedUrl(base, "dev", key, params));
+    const decoded = url.pathname.split("/").slice(2).map(decodeURIComponent).join("/");
+    expect(decoded).toBe(key);
   });
 });
 

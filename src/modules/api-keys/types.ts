@@ -49,10 +49,22 @@ export type VerifyPresignedOpts = {
   now: number;
 };
 
+export type PresignOpts = {
+  id: string;
+  ttl: number;
+  bucket: string;
+  key: string;
+  method: PresignMethod;
+};
+
+export type PresignData = { keyId: string; expires: number; sig: string };
+
 export interface Buns3ApiKeyStorage {
   verify(token: string): Buns3ApiKeyResult<ApiKey>;
 
   verifyPresigned(opts: VerifyPresignedOpts): Buns3ApiKeyPresignResult<ApiKey>;
+
+  presign(opts: PresignOpts): Buns3ApiKeyResult<PresignData>;
 
   create(
     input: CreateApiKey,

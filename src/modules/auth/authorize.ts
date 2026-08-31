@@ -8,10 +8,17 @@ import type {
   AuthorizeResult,
   ResolvedCredentialsResult,
 } from "./types";
-import { isPresignMethod } from "$/lib/presign";
+import { isPresignMethod, type PresignMethod } from "$/lib/presign";
 import { apiKeyStorage } from "../api-keys/api-key-storage";
 
 const PRESIGN_PARAM_KEYS = PresignParams.props.map((p) => p.key);
+
+export const methodCapabilityMap = {
+  GET: "read",
+  HEAD: "read",
+  DELETE: "write",
+  PUT: "write",
+} satisfies Record<PresignMethod, Exclude<AuthorizeCapability, "admin" | true>>;
 
 export function resolveCredentials(
   authorization?: string,

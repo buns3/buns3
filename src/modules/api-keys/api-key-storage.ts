@@ -6,7 +6,7 @@ import { ApiKeyToken } from "../validation/api-key";
 import { TOKEN_PREFIX } from "./constants";
 import { toApiKey } from "./mapping";
 import type { Buns3ApiKeyStorage } from "./types";
-import { deriveKeyId, hashToken, verify } from "$/lib/presign";
+import { deriveKeyId, hashToken, sign, verify } from "$/lib/presign";
 
 export const apiKeyStorage: Buns3ApiKeyStorage = {
   async verify(token) {
@@ -85,6 +85,40 @@ export const apiKeyStorage: Buns3ApiKeyStorage = {
     return {
       success: true,
       data: toApiKey(apiKey),
+    };
+  },
+
+  async presign(opts) {
+    const { id, bucket, key, method, ttl } = opts;
+
+    const apiKey = await db.orm.ApiKey.select("tokenHash")
+      .where({ id })
+      .first();
+
+    if (!apiKey) {
+      return {
+        success: false,
+        code: "INVALID_API_KEY",
+      };
+    }
+
+    const keyId = deriveKeyId(apiKey.tokenHash);
+    const expires = Math.floor(Date.now() / 1000) + ttl;
+    const sig = sign({
+      tokenHash: apiKey.tokenHash,
+      bucket,
+      key,
+      method,
+      expires,
+    });
+
+    return {
+      success: true,
+      data: {
+        expires,
+        keyId,
+        sig,
+      },
     };
   },
 

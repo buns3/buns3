@@ -1,4 +1,10 @@
-import { deriveKeyId, hashToken, PRESIGN_METHODS, sign } from "$/lib/presign";
+import {
+  buildPresignedUrl,
+  deriveKeyId,
+  hashToken,
+  PRESIGN_METHODS,
+  sign,
+} from "$/lib/presign";
 import { ApiKeyToken } from "$/modules/validation/api-key";
 import { BucketName } from "$/modules/validation/bucket";
 import { Key } from "$/modules/validation/object";
@@ -52,7 +58,7 @@ const validated = type({
   key: Key,
   bucket: BucketName,
   method: type.enumerated(...PRESIGN_METHODS),
-  ttl: type("string.integer.parse").to("0 <= number.integer <= 999999999999"),
+  ttl: type("string.integer.parse").to("0 <= number.integer <= 604800"),
 })(values);
 
 if (validated instanceof type.errors) {
@@ -60,9 +66,9 @@ if (validated instanceof type.errors) {
   process.exit(2);
 }
 
+const expires = Math.floor(Date.now() / 1000) + validated.ttl;
 const tokenHash = hashToken(validated.token);
 const keyId = deriveKeyId(tokenHash);
-const expires = Math.floor(Date.now() / 1000) + validated.ttl;
 const sig = sign({
   tokenHash,
   bucket: validated.bucket,
@@ -71,19 +77,18 @@ const sig = sign({
   expires,
 });
 
-const keyArr = validated.key.split("/");
-const key = keyArr.map(encodeURIComponent).join("/");
-
-const url = new URL(
-  `/${validated.bucket}/${key}`,
+const url = buildPresignedUrl(
   process.env.BASE_URL ?? "http://localhost:8000",
+  validated.bucket,
+  validated.key,
+  {
+    expires,
+    keyId,
+    sig,
+  },
 );
 
-url.searchParams.set("keyId", keyId);
-url.searchParams.set("expires", expires.toString());
-url.searchParams.set("sig", sig);
-
-console.log(url.href);
+console.log(url);
 console.log(
   "expires:",
   new Date(expires * 1000).toISOString(),

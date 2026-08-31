@@ -84,3 +84,19 @@ export function verify(opts: VerifyOptions): PresignVerifyResult {
     valid: true,
   };
 }
+
+export function buildPresignedUrl(
+  base: string,
+  bucket: string,
+  key: string,
+  { keyId, expires, sig }: { keyId: string; expires: number; sig: string },
+) {
+  const keyArr = key.split("/");
+  const encodedKey = keyArr.map(encodeURIComponent).join("/");
+  const url = new URL(`/${bucket}/${encodedKey}`, base);
+  url.searchParams.set("keyId", keyId);
+  url.searchParams.set("expires", expires.toString());
+  url.searchParams.set("sig", sig);
+
+  return url.href;
+}
