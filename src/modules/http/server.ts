@@ -4,6 +4,7 @@ import openapi from "@elysia/openapi";
 import { apiKeyRoutes } from "./routes/api-key.routes";
 import { objectsRoutes } from "./routes/objects.routes";
 import { bucketsRoutes } from "./routes/buckets.routes";
+import { selfRoutes } from "./routes/self.routes";
 
 export async function initServer() {
   const app = new Elysia({
@@ -35,6 +36,7 @@ export async function initServer() {
     .use(objectsRoutes)
     .use(apiKeyRoutes)
     .use(bucketsRoutes)
+    .use(selfRoutes)
 
     .listen(process.env.PORT ?? 8000);
 

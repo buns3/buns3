@@ -11,11 +11,6 @@ export const apiKeyRoutes = new Elysia({
 })
   .use(useAuth)
 
-  // whoami route
-  .get("/whoami", { auth: true }, ({ authState }) => {
-    return { apiKey: authState.kind === "key" ? authState.apiKey : null };
-  })
-
   .group("/keys", { auth: "admin" }, (group) =>
     group
       .get("", async () => {
