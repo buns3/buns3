@@ -1,7 +1,7 @@
 import Elysia, { status } from "elysia";
 import { useAuth } from "../middleware";
 import { ApiKeyId, CreateApiKey } from "$/modules/validation/api-key";
-import { Buns3Error, Buns3ValidationError, unwrap } from "$/lib/error";
+import { Buns3ValidationError, unwrap } from "$/lib/error";
 import { apiKeyStorage } from "$/modules/api-keys/api-key-storage";
 import { type } from "arktype";
 
