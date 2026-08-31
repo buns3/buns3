@@ -90,15 +90,16 @@
       const persist = (setter, storeKey) => (e) => { setter(e.target.value); store.set(storeKey, e.target.value); };
       const api = (path) => `${base.replace(/\/$/, "")}${path}`;
 
-      const run = useCallback(async (method, path, body) => {
+      const run = useCallback(async (method, path, body, tokenOverride) => {
         setBusy(true);
         const started = performance.now();
         let entry, json = null;
+        const bearer = tokenOverride ?? token;
         try {
           const resp = await fetch(api(path), {
             method,
             headers: {
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
               ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
             },
             body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -138,6 +139,26 @@
       }
 
       const [keys, setKeys] = useState(null);
+      const [presignKey, setPresignKey] = useState(store.get("buns3.presignKey", ""));
+      const [ps, setPs] = useState({ method: "GET", bucket: "", key: "", ttl: "3600" });
+      const psf = (patch) => setPs((f) => ({ ...f, ...patch }));
+      const [presigned, setPresigned] = useState(null);
+      const [copiedUrl, setCopiedUrl] = useState(false);
+
+      async function mintUrl() {
+        const { ok, json } = await run("POST", "/_self/presign", {
+          method: ps.method,
+          bucket: ps.bucket,
+          key: ps.key,
+          ttl: Number(ps.ttl),
+        }, presignKey);
+        setPresigned(ok ? { url: json.url, method: ps.method } : null);
+        setCopiedUrl(false);
+      }
+
+      async function copyUrl() {
+        try { await navigator.clipboard.writeText(presigned.url); setCopiedUrl(true); } catch {}
+      }
 
       async function refreshKeys() {
         const { ok, json } = await run("GET", "/_admin/keys");
@@ -269,10 +290,31 @@
 
           <h2>Presign</h2>
           <fieldset>
-            <p className="sub" style={{ margin: 0 }}>
-              coming later — presigning currently happens offline (<code>bun scripts/presign.ts</code>);
-              this section activates when the API can presign.
+            <p className="sub" style={{ marginBottom: 4 }}>
+              needs a <em>data</em> key — the admin token above structurally cannot presign
+              (control plane only); a key can only presign what it could do itself
             </p>
+            <label>data key (stored in localStorage)</label>
+            <input type="password" value={presignKey} onChange={persist(setPresignKey, "buns3.presignKey")} placeholder="buns3_…" />
+            <div className="row">
+              <div>
+                <label>method</label>
+                <select value={ps.method} onChange={(e) => psf({ method: e.target.value })}>
+                  {["GET", "HEAD", "PUT", "DELETE"].map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div><label>bucket</label><input type="text" value={ps.bucket} onChange={(e) => psf({ bucket: e.target.value })} /></div>
+              <div><label>key</label><input type="text" value={ps.key} onChange={(e) => psf({ key: e.target.value })} /></div>
+              <div><label>ttl (s, max 604800)</label><input type="text" value={ps.ttl} onChange={(e) => psf({ ttl: e.target.value })} /></div>
+            </div>
+            <button className="primary" disabled={busy || !presignKey || !ps.bucket || !ps.key} onClick={mintUrl}>presign</button>
+            {presigned && (
+              <div className="token-box">
+                <span className="warn">anyone holding this URL can {presigned.method} until it expires or the key is revoked</span>
+                <a href={presigned.url} target="_blank" rel="noreferrer">{presigned.url}</a>
+                <div><button className="small" onClick={copyUrl}>{copiedUrl ? "copied ✓" : "copy"}</button></div>
+              </div>
+            )}
           </fieldset>
 
           <h2>Log</h2>
