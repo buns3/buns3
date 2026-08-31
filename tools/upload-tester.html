@@ -185,7 +185,7 @@
             <button disabled={busy || !keyOrFile()} onClick={() => run("GET", objectUrl(keyOrFile()))}>GET</button>
             <button disabled={busy || !keyOrFile()} onClick={() => run("HEAD", objectUrl(keyOrFile()))}>HEAD</button>
             <button disabled={busy || !keyOrFile()} onClick={() => { if (confirm(`DELETE ${keyOrFile()}?`)) run("DELETE", objectUrl(keyOrFile())); }}>DELETE</button>
-            <button disabled={busy} onClick={() => run("GET", `${base.replace(/\/$/, "")}/_admin/whoami`)}>whoami</button>
+            <button disabled={busy} onClick={() => run("GET", `${base.replace(/\/$/, "")}/_self`)}>whoami</button>
           </fieldset>
 
           <h2>Log</h2>

@@ -137,6 +137,19 @@
         if (ok) refreshBuckets();
       }
 
+      const [keys, setKeys] = useState(null);
+
+      async function refreshKeys() {
+        const { ok, json } = await run("GET", "/_admin/keys");
+        setKeys(ok ? json.apiKeys : null);
+      }
+
+      async function revokeKey(k) {
+        if (!confirm(`Revoke key "${k.name}" (${k.tokenHint}…)? Its bearer 401s immediately.`)) return;
+        const { ok } = await run("DELETE", `/_admin/keys/${k.id}`);
+        if (ok) refreshKeys();
+      }
+
       async function mintKey() {
         const isAdmin = keyForm.kind === "admin";
         const payload = isAdmin
@@ -174,7 +187,7 @@
               <div><label>server</label><input type="text" value={base} onChange={persist(setBase, "buns3.base")} /></div>
               <div><label>admin token (stored in localStorage)</label><input type="password" value={token} onChange={persist(setToken, "buns3.adminToken")} placeholder="buns3_…" /></div>
             </div>
-            <button disabled={busy} onClick={() => run("GET", "/_admin/whoami")}>whoami</button>
+            <button disabled={busy} onClick={() => run("GET", "/_self")}>whoami</button>
           </fieldset>
 
           <h2>Buckets</h2>
@@ -229,6 +242,28 @@
                 {mintedToken}
                 <div><button className="small" onClick={copyToken}>{copied ? "copied ✓" : "copy"}</button></div>
               </div>
+            )}
+          </fieldset>
+
+          <h2>Keys</h2>
+          <fieldset>
+            <button className="primary" disabled={busy} onClick={refreshKeys}>refresh list</button>
+            {keys && (
+              <table>
+                <thead><tr><th>name</th><th>hint</th><th>scope</th><th>caps</th><th>last used</th><th></th></tr></thead>
+                <tbody>
+                  {keys.map((k) => (
+                    <tr key={k.id}>
+                      <td>{k.name}</td>
+                      <td className="off">{k.tokenHint}…</td>
+                      <td>{k.isAdmin ? "global" : k.bucketName}</td>
+                      <td className="off">{k.isAdmin ? "admin" : [k.canRead && "read", k.canWrite && "write"].filter(Boolean).join("+")}</td>
+                      <td className="off">{k.lastUsedAt ? new Date(k.lastUsedAt).toISOString().slice(0, 16) + "Z" : "never"}</td>
+                      <td><button className="small danger" disabled={busy} onClick={() => revokeKey(k)}>revoke</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </fieldset>
 
