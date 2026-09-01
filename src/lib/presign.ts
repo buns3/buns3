@@ -93,10 +93,8 @@ export function buildPresignedUrl(
 ) {
   const keyArr = key.split("/");
   const encodedKey = keyArr.map(encodeURIComponent).join("/");
-  const url = new URL(`/${bucket}/${encodedKey}`, base);
-  url.searchParams.set("keyId", keyId);
-  url.searchParams.set("expires", expires.toString());
-  url.searchParams.set("sig", sig);
 
-  return url.href;
+  const searchParams = `keyId=${keyId}&expires=${expires}&sig=${sig}`;
+
+  return `${base}/${bucket}/${encodedKey}?${searchParams}`;
 }

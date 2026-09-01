@@ -25,5 +25,24 @@ describe("Key", () => {
     ["NUL", "a\u0000b"],
     ["DEL", "a\u007Fb"],
     ["tab", "a\tb"],
+    // dot-segments: unaddressable via URL path (clients normalize them away)
+    ["dot", "."],
+    ["dotdot", ".."],
+    ["leading ./", "./a"],
+    ["leading ../", "../a"],
+    ["trailing /.", "a/."],
+    ["trailing /..", "a/.."],
+    ["mid /./", "a/./b"],
+    ["mid /../", "docs/../secret.txt"],
   ])("rejects %s", (_label, key) => expect(ok(Key(key))).toBe(false));
+
+  test.each([
+    ["dotfile", ".hidden"],
+    ["triple dot segment", "..."],
+    ["dot-prefixed segment", "..a"],
+    ["dots in filename", "file..txt"],
+    ["dotdot substring in segment", "a/...b/c"],
+  ])("accepts %s (not an exact dot-segment)", (_label, key) =>
+    expect(ok(Key(key))).toBe(true),
+  );
 });

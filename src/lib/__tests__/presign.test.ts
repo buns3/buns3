@@ -159,6 +159,16 @@ describe("buildPresignedUrl", () => {
     expect(new URL(url).pathname).toBe("/dev/my%20file%20%5B1%5D%3F.txt");
   });
 
+  test("does NOT apply URL path normalization to dot-segments", () => {
+    // regression: new URL() collapsed docs/../x -> x, breaking the sig match.
+    // (dot-segment keys still can't round-trip a URL path — clients normalize
+    //  too — but buildPresignedUrl must not be the one doing it.)
+    expect(buildPresignedUrl(base, "dev", "docs/../secret.txt", params)).toContain(
+      "/dev/docs/../secret.txt?",
+    );
+    expect(buildPresignedUrl(base, "dev", "a/./b.txt", params)).toContain("/dev/a/./b.txt?");
+  });
+
   test("server-side decode round-trips to the signed key", () => {
     const key = "påse 100% [x]/deep.txt";
     const url = new URL(buildPresignedUrl(base, "dev", key, params));

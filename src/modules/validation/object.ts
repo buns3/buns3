@@ -1,6 +1,11 @@
 import { type } from "arktype";
 
-export const Key = type(/^(?!\/+$)[^\u0000-\u001F\u007F]{1,1024}$/);
+export const Key = type(/^(?!\/+$)[^\u0000-\u001F\u007F]{1,1024}$/).narrow(
+  (key, ctx) =>
+    key.split("/").some((seg) => seg === "." || seg === "..")
+      ? ctx.reject({ expected: "a key with no '.' or '..' path segment" })
+      : true,
+);
 
 export const ObjectListQuery = type({
   "prefix?": Key,
