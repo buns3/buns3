@@ -1,6 +1,6 @@
 import Elysia, { status } from "elysia";
-import { useAuth } from "../middleware";
-import { BucketName, BucketUpdate } from "$/modules/validation/bucket";
+import { useAuth, useBucket } from "../middleware";
+import { BucketUpdate } from "$/modules/validation/bucket";
 import { Buns3ValidationError, unwrap } from "$/lib/error";
 import { type } from "arktype";
 import { bucketStorage } from "$/modules/storage/bucket";
@@ -9,6 +9,7 @@ export const bucketsRoutes = new Elysia({
   name: "routes:buckets",
   prefix: "/_admin",
 })
+  .use(useBucket)
   .use(useAuth)
 
   .get("/buckets", { auth: "admin" }, async () => {
@@ -18,58 +19,53 @@ export const bucketsRoutes = new Elysia({
 
   .head("/buckets", { auth: "admin" })
 
-  .get("/buckets/:name", { auth: "admin" }, async ({ params }) => {
-    const name = BucketName(params.name);
-    if (name instanceof type.errors) {
-      throw new Buns3ValidationError(name);
-    }
+  .get(
+    "/buckets/:bucket",
+    { auth: "admin", bucket: true },
+    async ({ bucket: bucketName }) => {
+      const { bucket } = unwrap(await bucketStorage.get(bucketName));
+      return { bucket };
+    },
+  )
 
-    const { bucket } = unwrap(await bucketStorage.get(name));
-    return { bucket };
-  })
+  .put(
+    "/buckets/:bucket",
+    { auth: "admin", bucket: true },
+    async ({ set, bucket: bucketName }) => {
+      const { bucket } = unwrap(await bucketStorage.create(bucketName));
 
-  .put("/buckets/:name", { auth: "admin" }, async ({ set, params }) => {
-    const name = BucketName(params.name);
-    if (name instanceof type.errors) {
-      throw new Buns3ValidationError(name);
-    }
+      set.headers["location"] = `/${bucketName}`;
+      return status(201, { bucket });
+    },
+  )
 
-    const { bucket } = unwrap(await bucketStorage.create(name));
+  .patch(
+    "/buckets/:bucket",
+    { auth: "admin", bucket: true },
+    async ({ bucket: bucketName, body }) => {
+      const input = BucketUpdate(body);
+      if (input instanceof type.errors) {
+        throw new Buns3ValidationError(input);
+      }
 
-    set.headers["location"] = `/${name}`;
-    return status(201, { bucket });
-  })
+      const { bucket } = unwrap(await bucketStorage.update(bucketName, input));
+      return status(200, { bucket });
+    },
+  )
 
-  .patch("/buckets/:name", { auth: "admin" }, async ({ params, body }) => {
-    const name = BucketName(params.name);
-    if (name instanceof type.errors) {
-      throw new Buns3ValidationError(name);
-    }
+  .delete(
+    "/buckets/:bucket",
+    { auth: "admin", bucket: true },
+    async ({ bucket: bucketName }) => {
+      unwrap(await bucketStorage.delete(bucketName));
+      return status(204, null);
+    },
+  )
 
-    const input = BucketUpdate(body);
-    if (input instanceof type.errors) {
-      throw new Buns3ValidationError(input);
-    }
-
-    const { bucket } = unwrap(await bucketStorage.update(name, input));
-    return status(200, { bucket });
-  })
-
-  .delete("/buckets/:name", { auth: "admin" }, async ({ params }) => {
-    const name = BucketName(params.name);
-    if (name instanceof type.errors) {
-      throw new Buns3ValidationError(name);
-    }
-
-    unwrap(await bucketStorage.delete(name));
-    return status(204, null);
-  })
-
-  .head("/buckets/:name", { auth: "admin" }, async ({ params }) => {
-    const name = BucketName(params.name);
-    if (name instanceof type.errors) {
-      throw new Buns3ValidationError(name);
-    }
-
-    unwrap(await bucketStorage.head(name));
-  });
+  .head(
+    "/buckets/:bucket",
+    { auth: "admin", bucket: true },
+    async ({ bucket: bucketName }) => {
+      unwrap(await bucketStorage.head(bucketName));
+    },
+  );
