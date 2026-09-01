@@ -3,6 +3,7 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "bun --watch ./src",
     "prisma:studio": "cd .. && bunx prisma@7 studio --url \"file://$SQLITE_PATH\""
