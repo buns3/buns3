@@ -13,6 +13,7 @@ export async function initServer() {
     .use(useErrorHandler)
     .use(
       openapi({
+        path: "/_openapi",
         exclude: {
           paths: ["/:bucket/*", "/:bucket"],
         },
