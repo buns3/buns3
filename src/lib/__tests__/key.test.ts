@@ -22,7 +22,7 @@ describe("prefixUpperBound", () => {
   });
 
   test("increments a full astral code point, not half a surrogate", () => {
-    const bound = prefixUpperBound("img/\u{1F600}"); // 😀
+    const bound = prefixUpperBound("img/\u{1F600}")!; // 😀
     expect(bound).toBe("img/\u{1F601}");
     // and the result is a well-formed string
     expect(bound.isWellFormed?.() ?? true).toBe(true);
@@ -34,7 +34,7 @@ describe("prefixUpperBound", () => {
 
   test("bounding property: prefixed keys land inside [prefix, bound)", () => {
     const prefix = "docs/";
-    const bound = prefixUpperBound(prefix);
+    const bound = prefixUpperBound(prefix)!;
     for (const key of ["docs/", "docs/a", "docs/zzz", "docs/\u{1F600}", "docs/100%.txt"]) {
       expect(key >= prefix).toBe(true);
       expect(key < bound).toBe(true);
@@ -44,7 +44,16 @@ describe("prefixUpperBound", () => {
     }
   });
 
-  test("U+10FFFF-final prefix throws (documented unreachable edge)", () => {
-    expect(() => prefixUpperBound("x\u{10FFFF}")).toThrow();
+  test("U+10FFFF-final prefix carries left instead of throwing", () => {
+    // last char is the max code point → can't increment it, so drop it and
+    // bump the previous character. (This is reachable via ?prefix= — it used
+    // to be an uncaught RangeError → 500.)
+    expect(prefixUpperBound("x\u{10FFFF}")).toBe("y");
+    expect(prefixUpperBound("ab\u{10FFFF}")).toBe("ac");
+  });
+
+  test("all-U+10FFFF prefix has no finite bound → null", () => {
+    expect(prefixUpperBound("\u{10FFFF}")).toBeNull();
+    expect(prefixUpperBound("\u{10FFFF}\u{10FFFF}")).toBeNull();
   });
 });

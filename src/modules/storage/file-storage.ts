@@ -57,9 +57,9 @@ export const fileStorage: Buns3Storage = {
     }
 
     if (prefix) {
-      query = query
-        .where((o) => o.key.gte(prefix))
-        .where((o) => o.key.lt(prefixUpperBound(prefix)));
+      query = query.where((o) => o.key.gte(prefix));
+      const upper = prefixUpperBound(prefix);
+      if (upper !== null) query = query.where((o) => o.key.lt(upper));
     }
 
     query = query.orderBy((o) => o.key.asc());
