@@ -1,4 +1,4 @@
-import type { Buns3Storage } from "./types";
+import type { Buns3BatchDeleteItemResult, Buns3Storage } from "./types";
 import path from "node:path";
 import { rename, mkdir } from "node:fs/promises";
 import { db } from "$/modules/prisma/db";
@@ -182,6 +182,59 @@ export const fileStorage: Buns3Storage = {
     }
 
     return { success: true, file: null, object: deleted };
+  },
+
+  async deleteMany(bucket, keys) {
+    const keySet = new Set(keys);
+    const uniqueKeys = [...keySet];
+    const rows = await db.orm.Object.select("id", "key")
+      .where({ bucketName: bucket })
+      .where((o) => o.key.in(uniqueKeys))
+      .all();
+
+    if (rows.length === 0) {
+      return {
+        success: true,
+        summary: { deleted: 0, missing: uniqueKeys.length },
+        results: uniqueKeys.map((key) => ({
+          success: false,
+          key,
+          code: "KEY_NOT_FOUND",
+        })),
+      };
+    }
+
+    const ids = rows.map((r) => r.id);
+    const deletedRows = await db.orm.Object.select("id", "key")
+      .where((o) => o.id.in(ids))
+      .deleteAll();
+
+    const deletedKeys = new Set(deletedRows.map((row) => row.key));
+
+    await Promise.all(
+      deletedRows.map(async (row) => {
+        try {
+          await resolve(bucket, row.id).unlink();
+        } catch (error) {
+          console.error(`orphaned blob ${bucket}/${row.id}:`, error);
+        }
+      }),
+    );
+
+    const results: Buns3BatchDeleteItemResult[] = uniqueKeys.map((key) =>
+      deletedKeys.has(key)
+        ? { success: true, key }
+        : { success: false, key, code: "KEY_NOT_FOUND" },
+    );
+
+    return {
+      success: true,
+      summary: {
+        deleted: deletedKeys.size,
+        missing: uniqueKeys.length - deletedKeys.size,
+      },
+      results,
+    };
   },
 
   async head(bucket, key) {

@@ -4,7 +4,7 @@ import { Buns3ValidationError, unwrap } from "$/lib/error";
 import { fileStorage } from "$/modules/storage/file-storage";
 import { applyObjectHeaders } from "../headers";
 import { uriEncodedKey } from "$/lib/request";
-import { ObjectListQuery } from "$/modules/validation/object";
+import { BatchDelete, ObjectListQuery } from "$/modules/validation/object";
 import { type } from "arktype";
 
 export const objectsRoutes = new Elysia({
@@ -36,6 +36,23 @@ export const objectsRoutes = new Elysia({
         nextAfter,
         objects,
       };
+    },
+  )
+
+  .delete(
+    "/:bucket",
+    { auth: "write", bucket: true },
+    async ({ bucket, body }) => {
+      const input = BatchDelete(body);
+      if (input instanceof type.errors) {
+        throw new Buns3ValidationError(input);
+      }
+
+      const { results, summary } = unwrap(
+        await fileStorage.deleteMany(bucket, input.keys),
+      );
+
+      return { bucket, summary, results };
     },
   )
 

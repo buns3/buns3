@@ -9,3 +9,9 @@ export const ObjectListQuery = type({
 });
 
 export type ObjectListQuery = typeof ObjectListQuery.infer;
+
+export const BatchDelete = type({
+  keys: Key.array().atLeastLength(1).atMostLength(1000),
+});
+
+export type BatchDelete = typeof BatchDelete.infer;

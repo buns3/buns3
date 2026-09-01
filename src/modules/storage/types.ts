@@ -68,6 +68,22 @@ export type Buns3FileListResult = Promise<
     }
 >;
 
+export type Buns3BatchDeleteItemResult =
+  | { success: true; key: string }
+  | { success: false; key: string; code: Buns3ErrorCode };
+
+export type Buns3BatchDeleteResult = Promise<
+  | {
+      success: true;
+      results: Buns3BatchDeleteItemResult[];
+      summary: { deleted: number; missing: number };
+    }
+  | {
+      success: false;
+      code: Buns3ErrorCode;
+    }
+>;
+
 export type StorageListOptions = {
   bucket: string;
 } & ObjectListQuery;
@@ -87,6 +103,8 @@ export interface Buns3Storage {
   ): Buns3FileResult<Bun.FileBlob>;
 
   delete(bucket: string, key: string): Buns3FileResult<null>;
+
+  deleteMany(bucket: string, keys: string[]): Buns3BatchDeleteResult;
 
   head(bucket: string, key: string): Buns3FileResult<null>;
 }
