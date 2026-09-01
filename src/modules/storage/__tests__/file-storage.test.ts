@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileStorage } from "../file-storage";
 import { blobPath, dataPath, resetStorage, seedBucket, seedObject } from "../../../../test/helpers";
@@ -34,6 +34,23 @@ describe("fileStorage.put", () => {
     expect(bucketBlobs("alpha")).toEqual([result.object.id]);
     expect(existsSync(blobPath("alpha", first.id))).toBe(false);
     expect(tmpEntries()).toEqual([]);
+  });
+
+  test("overwrite survives a failing old-blob unlink (no new-blob loss)", async () => {
+    await seedBucket("alpha");
+    const first = await seedObject("alpha", "k.txt", "v1");
+    // simulate the old blob already gone (crash/concurrent-delete): its unlink
+    // will reject, and the fix must not let that clobber the freshly written blob
+    rmSync(blobPath("alpha", first.id), { force: true });
+
+    const result = await fileStorage.put("alpha", "k.txt", new Blob(["v2"]).stream(), "text/plain");
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.object.id).not.toBe(first.id);
+    expect(existsSync(blobPath("alpha", result.object.id))).toBe(true);
+    // pointer and blob agree — a subsequent GET returns the new content
+    const got = await fileStorage.get("alpha", "k.txt");
+    expect(got.success && (await got.file.text())).toBe("v2");
   });
 
   test("zero-byte object is allowed", async () => {

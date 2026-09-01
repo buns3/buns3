@@ -145,8 +145,12 @@ export const fileStorage: Buns3Storage = {
       });
 
       if (existingObject) {
-        // Unlink old file -> replaced by new one
-        await resolve(bucket, existingObject.id).unlink();
+        try {
+          // Unlink old file -> replaced by new one
+          await resolve(bucket, existingObject.id).unlink();
+        } catch (err) {
+          console.error("orphaned blob", bucket, existingObject.id, err);
+        }
       }
 
       return { success: true, file, object: newObject };
