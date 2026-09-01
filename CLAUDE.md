@@ -84,7 +84,7 @@ DONE (cont.): **`/_self` credential plane** (5ebf31f) — the three-planes rule:
 
 NEXT (in order):
 1. **Tier-2 tests** — DB-backed (`authorize`, keyStorage, bucket/file storage): design is agreed & banked in Claude's memory (template-copy SQLite fixture, env seams, per-test reset); build any evening.
-3. Later candy: admin tester "empty bucket" button (list → batch delete, one fetch now that both exist); global data keys (bucketName null + capabilities — enforcement already supports it via `inScope`, only the CreateApiKey union forbids; parked by choice). (crypto.subtle browser signer: OBSOLETE — the API endpoint + tester wiring made it moot.)
+2. Later candy: admin tester "empty bucket" button (list → batch delete, one fetch now that both exist); global data keys (bucketName null + capabilities — enforcement already supports it via `inScope`, only the CreateApiKey union forbids; parked by choice). (crypto.subtle browser signer: OBSOLETE — the API endpoint + tester wiring made it moot.)
 
 PARKED (deliberately): upstream bug reports — Sebastian opted out (2026-08-30). Receipts stay in git/transcripts if ever revisited: Elysia Content-Range on 200s, schema-slot Standard Schema messages dropped, macro autocomplete, derive-union ctx collapse; @elysia/openapi typebox imports (patched), RegExp exclude, peer range; Prisma `now()` codec round-trip; Babel 8 standalone react preset vs classic script tags.
 
