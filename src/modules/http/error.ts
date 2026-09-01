@@ -9,73 +9,69 @@ import Elysia, {
 } from "elysia";
 
 export const ERROR_STATUS = {
-  VALIDATION_ERROR: 422,
-  KEY_NOT_FOUND: 404,
-  INVALID_KEY: 422,
-  BUCKET_NOT_FOUND: 404,
-  BUCKET_ALREADY_EXIST: 409,
-  BUCKET_NOT_EMPTY: 409,
-  FS_ERROR: 500,
+  // 4xx
+  MALFORMED_BODY: 400,
   INVALID_API_KEY: 401,
+  PRESIGNED_EXPIRED: 401,
   API_KEY_NOT_CAPABLE: 403,
   API_KEY_SCOPE_MISMATCH: 403,
+  KEY_NOT_FOUND: 404,
+  BUCKET_NOT_FOUND: 404,
   API_KEY_NOT_FOUND: 404,
-  PRESIGNED_EXPIRED: 401,
+  NOT_FOUND: 404,
+  BUCKET_ALREADY_EXIST: 409,
+  BUCKET_NOT_EMPTY: 409,
+  VALIDATION_ERROR: 422,
+
+  // 5xx
+  FS_ERROR: 500,
   UNKNOWN: 500,
 } as const satisfies Record<Buns3AnyErrorCode, number>;
+
+function fail(code: Buns3AnyErrorCode, detail?: string) {
+  return problem(ERROR_STATUS[code], detail ? { code, detail } : { code });
+}
+
+function fail500(error: unknown) {
+  const ref = crypto.randomUUID().substring(0, 8);
+  console.error("Error Ref:", ref, error);
+  return fail("UNKNOWN", `An unexpected error occurred (ref: ${ref})`);
+}
 
 export const useErrorHandler = new Elysia({
   name: "buns3ErrorHandler",
   as: "global",
 })
-  .error(Buns3Error, ({ set, error }) => {
-    if (error.code === "INVALID_API_KEY") {
-      set.headers["WWW-Authenticate"] = "Bearer";
+  .error(Buns3Error, ({ error }) => {
+    const status = ERROR_STATUS[error.code];
+    if (status >= 500) {
+      return fail500(error);
     }
 
-    return problem(ERROR_STATUS[error.code], { code: error.code });
+    return fail(error.code);
   })
   .error(Buns3ValidationError, ({ error }) => {
-    return problem(ERROR_STATUS[error.code], {
-      code: "VALIDATION_ERROR",
-      detail: error.errors.summary,
-    });
+    return fail("VALIDATION_ERROR", error.errors.summary);
   })
   .error(ValidationError, ({ error }) => {
-    return problem(422, {
-      code: "VALIDATION_ERROR",
-      detail: error.message,
-    });
+    return fail("VALIDATION_ERROR", error.message);
   })
   .error(ParseError, ({ error }) => {
-    return problem(400, {
-      code: "MALFORMED_BODY",
-      detail:
-        (error.cause as Error | undefined)?.message ??
+    return fail(
+      "MALFORMED_BODY",
+      (error.cause as Error | undefined)?.message ??
         "Failed to parse request body",
-    });
+    );
   })
   .error(NotFound, ({ request }) => {
-    return problem(404, {
-      code: "NOT_FOUND",
-      detail: `No route for ${request.method} ${new URL(request.url).pathname}`,
-    });
+    return fail(
+      "NOT_FOUND",
+      `No route for ${request.method} ${new URL(request.url).pathname}`,
+    );
   })
   .error(InternalServerError, ({ error }) => {
-    const ref = crypto.randomUUID().substring(0, 8);
-    console.error(ref, error);
-
-    return problem(500, {
-      code: "UNKNOWN",
-      detail: `An unexpected error occurred (ref: ${ref})`,
-    });
+    return fail500(error);
   })
   .error(({ error }) => {
-    const ref = crypto.randomUUID().substring(0, 8);
-    console.error(ref, error);
-
-    return problem(500, {
-      code: "UNKNOWN",
-      detail: `An unexpected error occurred (ref: ${ref})`,
-    });
+    return fail500(error);
   });

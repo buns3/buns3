@@ -1,10 +1,11 @@
 export const ERROR_CODES = [
   "KEY_NOT_FOUND",
-  "INVALID_KEY",
   "BUCKET_NOT_FOUND",
   "BUCKET_ALREADY_EXIST",
   "BUCKET_NOT_EMPTY",
+  "MALFORMED_BODY",
   "FS_ERROR",
+  "NOT_FOUND",
   "UNKNOWN",
 ] as const;
 
