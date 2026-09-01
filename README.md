@@ -3,6 +3,9 @@
 A small S3-like object storage server. Buckets, objects, API keys, presigned
 URLs, listing — streamed to disk, metadata in SQLite, one process.
 
+Pronounced "bun-ess-three". Other pronunciations exist and are wrong, which
+has never stopped anyone.
+
 This is a learning project. S3 is the reference point, not the requirement:
 its ideas are kept where they're independently good and dropped where they're
 baggage. Every behavior below was decided on purpose, and the interesting
