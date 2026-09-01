@@ -17,7 +17,9 @@ export const bucketsRoutes = new Elysia({
     return Response.json({ buckets });
   })
 
-  .head("/buckets", { auth: "admin" })
+  .head("/buckets", { auth: "admin" }, () => {
+    status(200, null);
+  })
 
   .get(
     "/buckets/:bucket",
