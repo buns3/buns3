@@ -37,7 +37,7 @@ export type AuthorizeResult =
       code: Buns3ApiKeyErrorCode | Buns3PresignErrorCode;
     };
 
-export type AuthorizeCapability = "read" | "write" | "admin" | true;
+export type AuthorizeCapability = "read" | "list" | "write" | "admin" | true;
 
 export type AuthState =
   | { kind: "key"; apiKey: ApiKey }

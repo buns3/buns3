@@ -14,7 +14,7 @@ export async function initServer() {
     .use(
       openapi({
         exclude: {
-          paths: ["/:bucket/*"],
+          paths: ["/:bucket/*", "/:bucket"],
         },
         documentation: {
           components: {

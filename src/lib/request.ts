@@ -1,4 +1,4 @@
-import { type StorageObject } from "$/modules/storage/types";
+import { type ObjectRow } from "$/modules/storage/types";
 import { keyToFilename } from "./key";
 
 export function strictEncode(value: string) {
@@ -17,7 +17,7 @@ export function uriEncodedKey(key: string) {
   return key.split("/").map(strictEncode).join("/");
 }
 
-export function objectHeaders(object: StorageObject) {
+export function objectHeaders(object: ObjectRow) {
   const filename = uriEncodedFilename(keyToFilename(object.key));
 
   const headers = new Headers();

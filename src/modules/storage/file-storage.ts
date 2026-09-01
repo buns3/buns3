@@ -3,6 +3,8 @@ import path from "node:path";
 import { rename, mkdir } from "node:fs/promises";
 import { db } from "$/modules/prisma/db";
 import { BASE_PATH, TEMP_DIR_NAME } from "./constants";
+import { toObjectSummary } from "./mapping";
+import { prefixUpperBound } from "$/lib/key";
 
 function resolvePath(bucket: string, key: string) {
   return path.resolve(BASE_PATH, bucket, key);
@@ -43,6 +45,32 @@ export const fileStorage: Buns3Storage = {
       success: true,
       file,
       object: existingObject,
+    };
+  },
+
+  async list(opts) {
+    const { bucket, after = null, limit = 100, prefix = null } = opts;
+    let query = db.orm.Object.where({ bucketName: bucket });
+
+    if (after) {
+      query = query.where((o) => o.key.gt(after));
+    }
+
+    if (prefix) {
+      query = query
+        .where((o) => o.key.gte(prefix))
+        .where((o) => o.key.lt(prefixUpperBound(prefix)));
+    }
+
+    query = query.orderBy((o) => o.key.asc());
+
+    const objects = await query.limit(limit + 1).all();
+
+    return {
+      success: true,
+      filters: { limit, prefix, after },
+      nextAfter: objects.length > limit ? objects[limit - 1]!.key : null,
+      objects: objects.slice(0, limit).map(toObjectSummary),
     };
   },
 

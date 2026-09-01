@@ -1,15 +1,43 @@
 import Elysia, { status } from "elysia";
-import { useAuth, useBucketKey } from "../middleware";
-import { unwrap } from "$/lib/error";
+import { useAuth, useBucket, useBucketKey } from "../middleware";
+import { Buns3ValidationError, unwrap } from "$/lib/error";
 import { fileStorage } from "$/modules/storage/file-storage";
 import { applyObjectHeaders } from "../headers";
 import { uriEncodedKey } from "$/lib/request";
+import { ObjectListQuery } from "$/modules/validation/object";
+import { type } from "arktype";
 
 export const objectsRoutes = new Elysia({
   name: "routes:objects",
 })
   .use(useAuth)
+  .use(useBucket)
   .use(useBucketKey)
+
+  .get(
+    "/:bucket",
+    { auth: "list", bucket: true },
+    async ({ bucket, query }) => {
+      const filters = ObjectListQuery(query);
+      if (filters instanceof type.errors) {
+        throw new Buns3ValidationError(filters);
+      }
+
+      const {
+        objects,
+        filters: effectiveFilters,
+        nextAfter,
+      } = unwrap(await fileStorage.list({ bucket, ...filters }));
+
+      return {
+        bucket,
+        filters: effectiveFilters,
+        count: objects.length,
+        nextAfter,
+        objects,
+      };
+    },
+  )
 
   .group("/:bucket/*", (group) =>
     group

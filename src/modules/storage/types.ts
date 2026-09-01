@@ -2,6 +2,7 @@ import type { DefaultModelRow } from "@prisma/orm-sqlite/orm-client";
 import type { Buns3ErrorCode } from "$/lib/error-codes";
 import type { Contract } from "../prisma/contract";
 import type { BucketUpdate } from "../validation/bucket";
+import type { ObjectListQuery } from "../validation/object";
 
 export type BucketRow = DefaultModelRow<Contract, "Bucket">;
 export type BucketRowWithCount = DefaultModelRow<Contract, "Bucket"> & {
@@ -9,13 +10,17 @@ export type BucketRowWithCount = DefaultModelRow<Contract, "Bucket"> & {
 };
 export type Bucket = Omit<BucketRow, "publicRead"> & { publicRead: boolean };
 export type BucketWithCount = Bucket & { objects: number };
-export type StorageObject = DefaultModelRow<Contract, "Object">;
+
+export type ObjectRow = DefaultModelRow<Contract, "Object">;
+export type ObjectSummary = Omit<ObjectRow, "bucketName" | "id"> & {
+  etag: string;
+};
 
 export type Buns3FileResult<TFile> = Promise<
   | {
       success: true;
       file: TFile;
-      object: StorageObject;
+      object: ObjectRow;
     }
   | {
       success: false;
@@ -45,10 +50,34 @@ export type Buns3BucketListResult = Promise<
     }
 >;
 
+export type Buns3FileListResult = Promise<
+  | {
+      success: true;
+      filters: {
+        [k in keyof Required<ObjectListQuery>]: Exclude<
+          ObjectListQuery[k],
+          undefined
+        > | null;
+      };
+      nextAfter: string | null;
+      objects: ObjectSummary[];
+    }
+  | {
+      success: false;
+      code: Buns3ErrorCode;
+    }
+>;
+
+export type StorageListOptions = {
+  bucket: string;
+} & ObjectListQuery;
+
 export interface Buns3Storage {
   init(): Promise<void>;
 
   get(bucket: string, key: string): Buns3FileResult<Bun.FileBlob>;
+
+  list(opts: StorageListOptions): Buns3FileListResult;
 
   put(
     bucket: string,

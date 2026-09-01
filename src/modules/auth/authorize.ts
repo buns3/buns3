@@ -199,6 +199,7 @@ export function hasCapability(
 
   return {
     read: apiKey.canRead,
+    list: apiKey.canRead,
     write: apiKey.canWrite,
     admin: apiKey.isAdmin,
   }[capability];

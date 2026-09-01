@@ -5,7 +5,7 @@ import { Key } from "../validation/object";
 import { type } from "arktype";
 import { BucketName } from "../validation/bucket";
 import { authorize, resolveCredentials } from "../auth/authorize";
-import type { AuthState } from "../auth/types";
+import type { AuthorizeCapability, AuthState } from "../auth/types";
 
 export const useBucketKey = new Elysia({ name: "middleware:bucket-key" }).macro(
   {
@@ -32,10 +32,24 @@ export const useBucketKey = new Elysia({ name: "middleware:bucket-key" }).macro(
   },
 );
 
+export const useBucket = new Elysia({ name: "middleware:bucket" }).macro({
+  bucket: {
+    derive: ({ params }) => {
+      const { bucket } = params;
+      const bucketResult = BucketName(bucket);
+      if (bucketResult instanceof type.errors) {
+        throw new Buns3ValidationError(bucketResult);
+      }
+
+      return { bucket: bucketResult };
+    },
+  },
+});
+
 export const useAuth = new Elysia({
   name: "middleware:auth",
 }).macro({
-  auth: (capability?: "read" | "write" | "admin" | true) => ({
+  auth: (capability?: AuthorizeCapability) => ({
     derive: async ({ headers, query }) => {
       const { credentials } = unwrap(
         resolveCredentials(headers.authorization, query),

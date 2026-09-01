@@ -1,12 +1,9 @@
 import type { HTTPHeaders } from "elysia";
-import type { StorageObject } from "../storage/types";
+import type { ObjectRow } from "../storage/types";
 import { uriEncodedFilename } from "$/lib/request";
 import { keyToFilename } from "$/lib/key";
 
-export function applyObjectHeaders(
-  headers: HTTPHeaders,
-  object: StorageObject,
-) {
+export function applyObjectHeaders(headers: HTTPHeaders, object: ObjectRow) {
   const filename = uriEncodedFilename(keyToFilename(object.key));
   headers["content-type"] = object.contentType;
   headers["last-modified"] = object.createdAt.toUTCString();
