@@ -10,11 +10,11 @@
   },
   "devDependencies": {
     "@prisma/cli-engine": "^0.3.0",
-    "@types/bun": "latest",
+    "@types/bun": "catalog:dev",
     "dotenv": "^17.4.2"
   },
   "peerDependencies": {
-    "typescript": "^7"
+    "typescript": "catalog:dev"
   },
   "dependencies": {
     "@elysia/openapi": "2.0.0-beta.1",
@@ -24,5 +24,16 @@
   },
   "patchedDependencies": {
     "@elysia/openapi@2.0.0-beta.1": "patches/@elysia%2Fopenapi@2.0.0-beta.1.patch"
+  },
+  "workspaces": {
+    "packages": [
+      "packages/*"
+    ],
+    "catalogs": {
+      "dev": {
+        "@types/bun": "1.4.0",
+        "typescript": "7.0.2"
+      }
+    }
   }
 }

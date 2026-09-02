@@ -1,0 +1,31 @@
+{
+  "name": "@buns3/sdk",
+  "version": "0.1.0",
+  "module": "src/index.ts",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    "require": {
+      "types": "./dist/index.d.cts",
+      "default": "./dist/index.cjs"
+    },
+    "import": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsdown --watch",
+    "build": "tsdown"
+  },
+  "devDependencies": {
+    "tsdown": "0.22.14"
+  },
+  "peerDependencies": {
+    "typescript": "catalog:dev"
+  }
+}
