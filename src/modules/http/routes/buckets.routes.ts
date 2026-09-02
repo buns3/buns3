@@ -13,7 +13,7 @@ export const bucketsRoutes = new Elysia({
 
   .get("/buckets", { auth: "admin" }, async () => {
     const { buckets } = unwrap(await bucketStorage.list());
-    return Response.json({ buckets });
+    return { buckets };
   })
 
   .get(
