@@ -1,8 +1,7 @@
 import Elysia, { status } from "elysia";
 import { useAuth, useBucket } from "../middleware";
 import { BucketUpdate } from "$/modules/validation/bucket";
-import { Buns3ValidationError, unwrap } from "$/lib/error";
-import { type } from "arktype";
+import { unwrap, validate } from "$/lib/error";
 import { bucketStorage } from "$/modules/storage/bucket";
 
 export const bucketsRoutes = new Elysia({
@@ -41,10 +40,7 @@ export const bucketsRoutes = new Elysia({
     "/buckets/:bucket",
     { auth: "admin", bucket: true },
     async ({ bucket: bucketName, body }) => {
-      const input = BucketUpdate(body);
-      if (input instanceof type.errors) {
-        throw new Buns3ValidationError(input);
-      }
+      const input = validate(BucketUpdate, body);
 
       const { bucket } = unwrap(await bucketStorage.update(bucketName, input));
       return status(200, { bucket });

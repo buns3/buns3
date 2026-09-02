@@ -1,3 +1,5 @@
+import { uriEncodedKey } from "./request";
+
 const IDENTIFIER = "buns3-presign-v1";
 
 export const PRESIGN_METHODS = ["GET", "HEAD", "PUT", "DELETE"] as const;
@@ -91,8 +93,7 @@ export function buildPresignedUrl(
   key: string,
   { keyId, expires, sig }: { keyId: string; expires: number; sig: string },
 ) {
-  const keyArr = key.split("/");
-  const encodedKey = keyArr.map(encodeURIComponent).join("/");
+  const encodedKey = uriEncodedKey(key);
 
   const searchParams = `keyId=${keyId}&expires=${expires}&sig=${sig}`;
 

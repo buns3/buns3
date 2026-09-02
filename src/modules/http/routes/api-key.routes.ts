@@ -1,9 +1,8 @@
 import Elysia, { status } from "elysia";
 import { useAuth } from "../middleware";
 import { ApiKeyId, CreateApiKey } from "$/modules/validation/api-key";
-import { Buns3ValidationError, unwrap } from "$/lib/error";
+import { unwrap, validate } from "$/lib/error";
 import { apiKeyStorage } from "$/modules/api-keys/api-key-storage";
-import { type } from "arktype";
 
 export const apiKeyRoutes = new Elysia({
   name: "routes:api-keys",
@@ -19,20 +18,14 @@ export const apiKeyRoutes = new Elysia({
       })
 
       .post("", async ({ body }) => {
-        const input = CreateApiKey(body);
-        if (input instanceof type.errors) {
-          throw new Buns3ValidationError(input);
-        }
+        const input = validate(CreateApiKey, body);
 
         const { data } = unwrap(await apiKeyStorage.create(input));
         return status(201, data);
       })
 
       .delete("/:id", async ({ params }) => {
-        const keyId = ApiKeyId(params.id);
-        if (keyId instanceof type.errors) {
-          throw new Buns3ValidationError(keyId);
-        }
+        const keyId = validate(ApiKeyId, params.id);
 
         unwrap(await apiKeyStorage.delete(keyId));
 

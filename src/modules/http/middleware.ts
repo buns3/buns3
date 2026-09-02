@@ -1,8 +1,7 @@
 import Elysia, { NotFound, t, type Context } from "elysia";
 import { apiKeyStorage } from "../api-keys/api-key-storage";
-import { Buns3Error, Buns3ValidationError, unwrap } from "$/lib/error";
+import { Buns3Error, unwrap, validate } from "$/lib/error";
 import { Key } from "../validation/object";
-import { type } from "arktype";
 import { BucketName } from "../validation/bucket";
 import { authorize, resolveCredentials } from "../auth/authorize";
 import type { AuthorizeCapability, AuthState } from "../auth/types";
@@ -16,18 +15,8 @@ export const useBucketKey = new Elysia({ name: "middleware:bucket-key" }).macro(
           throw new NotFound();
         }
 
-        const keyResult = Key(key);
-        if (keyResult instanceof type.errors) {
-          throw new Buns3ValidationError(keyResult);
-        }
-
-        const bucketResult = BucketName(bucket);
-        if (bucketResult instanceof type.errors) {
-          throw new Buns3ValidationError(bucketResult);
-        }
-
-        params.bucket = bucketResult;
-        params["*"] = keyResult;
+        params["*"] = validate(Key, key);
+        params.bucket = validate(BucketName, bucket);
       },
 
       derive: ({ params }) => {
@@ -41,13 +30,7 @@ export const useBucketKey = new Elysia({ name: "middleware:bucket-key" }).macro(
 export const useBucket = new Elysia({ name: "middleware:bucket" }).macro({
   bucket: {
     transform: ({ params }) => {
-      const { bucket } = params;
-      const bucketResult = BucketName(bucket);
-      if (bucketResult instanceof type.errors) {
-        throw new Buns3ValidationError(bucketResult);
-      }
-
-      params.bucket = bucketResult;
+      params.bucket = validate(BucketName, params.bucket);
     },
 
     derive: ({ params }) => {

@@ -1,6 +1,6 @@
 // Framework-free on purpose: no Elysia imports. Rendering (status table, .error registrations) lives in the HTTP layer.
 
-import type { type } from "arktype";
+import { type } from "arktype";
 import type {
   Buns3AnyErrorCode,
   Buns3ValidationErrorCode,
@@ -46,4 +46,13 @@ export function unwrap<TResult extends Buns3ResultLike>(
 ): Extract<TResult, { success: true }> {
   if (!result.success) throw Buns3Error.fromResult(result);
   return result as Extract<TResult, { success: true }>;
+}
+
+export function validate<T>(
+  schema: (input: unknown) => T | type.errors,
+  input: unknown,
+): T {
+  const result = schema(input);
+  if (result instanceof type.errors) throw new Buns3ValidationError(result);
+  return result;
 }

@@ -1,9 +1,8 @@
 import Elysia, { status } from "elysia";
 import { useAuth } from "../middleware";
-import { Buns3Error, Buns3ValidationError, unwrap } from "$/lib/error";
+import { Buns3Error, unwrap, validate } from "$/lib/error";
 import { apiKeyStorage } from "$/modules/api-keys/api-key-storage";
 import { PresignRequest } from "$/modules/validation/presign";
-import { type } from "arktype";
 import { authorize, methodCapabilityMap } from "$/modules/auth/authorize";
 import { buildPresignedUrl } from "$/lib/presign";
 
@@ -26,10 +25,7 @@ export const selfRoutes = new Elysia({ name: "routes:self", prefix: "/_self" })
   })
 
   .post("/presign", { auth: true }, async ({ authState, body }) => {
-    const input = PresignRequest(body);
-    if (input instanceof type.errors) {
-      throw new Buns3ValidationError(input);
-    }
+    const input = validate(PresignRequest, body);
 
     // type-narrowing guard, not a real branch
     if (authState.kind !== "key") {
