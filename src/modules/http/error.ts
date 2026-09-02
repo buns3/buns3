@@ -42,10 +42,14 @@ export const useErrorHandler = new Elysia({
   name: "buns3ErrorHandler",
   as: "global",
 })
-  .error(Buns3Error, ({ error }) => {
+  .error(Buns3Error, ({ error, set }) => {
     const status = ERROR_STATUS[error.code];
     if (status >= 500) {
       return fail500(error);
+    }
+
+    if (status === 401) {
+      set.headers["www-authenticate"] = "Bearer";
     }
 
     return fail(error.code);
