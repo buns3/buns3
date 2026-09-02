@@ -17,10 +17,6 @@ export const bucketsRoutes = new Elysia({
     return Response.json({ buckets });
   })
 
-  .head("/buckets", { auth: "admin" }, () => {
-    status(200, null);
-  })
-
   .get(
     "/buckets/:bucket",
     { auth: "admin", bucket: true },
@@ -61,13 +57,5 @@ export const bucketsRoutes = new Elysia({
     async ({ bucket: bucketName }) => {
       unwrap(await bucketStorage.delete(bucketName));
       return status(204, null);
-    },
-  )
-
-  .head(
-    "/buckets/:bucket",
-    { auth: "admin", bucket: true },
-    async ({ bucket: bucketName }) => {
-      unwrap(await bucketStorage.head(bucketName));
     },
   );

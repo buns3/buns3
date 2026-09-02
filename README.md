@@ -169,6 +169,11 @@ consulting whether the target exists. Stray requests under `_`-prefixed paths
 fail bucket-name validation (422) without any lookup — real S3 answers the
 same probe with 404 `NoSuchBucket`, existence disclosed.
 
+**HEAD exists only for objects.** It's the one endpoint where the body is
+expensive to send; everything else returns small JSON, so GET is the answer.
+HEAD on an object agrees with GET about existence — if GET would 404, so does
+HEAD.
+
 **Deletes are honest, not idempotent.** Deleting something that isn't there is
 a 404 (or a per-key `KEY_NOT_FOUND` in a batch), not S3's cheerful 204. If you
 thought it existed and it didn't, that's information.

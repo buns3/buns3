@@ -160,26 +160,6 @@ export const bucketStorage: Buns3BucketStorage = {
     };
   },
 
-  async head(bucket) {
-    const existingBucket = await db.orm.Bucket.include("objects", (o) =>
-      o.count(),
-    ).first({
-      name: bucket,
-    });
-
-    if (!existingBucket) {
-      return {
-        success: false,
-        code: "BUCKET_NOT_FOUND",
-      };
-    }
-
-    return {
-      success: true,
-      bucket: toBucketWithCount(existingBucket),
-    };
-  },
-
   async list() {
     const buckets = await db.orm.Bucket.include("objects", (o) =>
       o.count(),

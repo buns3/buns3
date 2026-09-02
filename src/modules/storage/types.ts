@@ -105,8 +105,6 @@ export interface Buns3Storage {
   delete(bucket: string, key: string): Buns3FileResult<null>;
 
   deleteMany(bucket: string, keys: string[]): Buns3BatchDeleteResult;
-
-  head(bucket: string, key: string): Buns3FileResult<null>;
 }
 
 export interface Buns3BucketStorage {
@@ -117,8 +115,6 @@ export interface Buns3BucketStorage {
   update(bucket: string, opts?: BucketUpdate): Buns3BucketResult;
 
   delete(bucket: string): Buns3BucketResult;
-
-  head(bucket: string): Buns3BucketResult;
 
   list(): Buns3BucketListResult;
 }

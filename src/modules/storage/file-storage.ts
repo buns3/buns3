@@ -240,24 +240,4 @@ export const fileStorage: Buns3Storage = {
       results,
     };
   },
-
-  async head(bucket, key) {
-    const existingObject = await db.orm.Object.where({
-      bucketName: bucket,
-      key,
-    }).first();
-
-    if (!existingObject) {
-      return {
-        success: false,
-        code: "KEY_NOT_FOUND",
-      };
-    }
-
-    return {
-      success: true,
-      file: null,
-      object: existingObject,
-    };
-  },
 };
