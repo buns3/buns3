@@ -10,7 +10,7 @@ import type { AuthorizeCapability, AuthState } from "../auth/types";
 export const useBucketKey = new Elysia({ name: "middleware:bucket-key" }).macro(
   {
     bucketKey: {
-      derive: ({ params }) => {
+      transform: ({ params }) => {
         const { bucket, "*": key } = params;
         if (!key) {
           throw new NotFound();
@@ -26,7 +26,13 @@ export const useBucketKey = new Elysia({ name: "middleware:bucket-key" }).macro(
           throw new Buns3ValidationError(bucketResult);
         }
 
-        return { bucket: bucketResult, key: keyResult };
+        params.bucket = bucketResult;
+        params["*"] = keyResult;
+      },
+
+      derive: ({ params }) => {
+        // Both params validated in the "transform" above
+        return { bucket: params.bucket!, key: params["*"]! };
       },
     },
   },
@@ -34,14 +40,19 @@ export const useBucketKey = new Elysia({ name: "middleware:bucket-key" }).macro(
 
 export const useBucket = new Elysia({ name: "middleware:bucket" }).macro({
   bucket: {
-    derive: ({ params }) => {
+    transform: ({ params }) => {
       const { bucket } = params;
       const bucketResult = BucketName(bucket);
       if (bucketResult instanceof type.errors) {
         throw new Buns3ValidationError(bucketResult);
       }
 
-      return { bucket: bucketResult };
+      params.bucket = bucketResult;
+    },
+
+    derive: ({ params }) => {
+      // Bucket-param validated in the "transform" above
+      return { bucket: params.bucket! };
     },
   },
 });
