@@ -4,9 +4,30 @@
   "module": "src/index.ts",
   "license": "MIT",
   "type": "module",
+  "description": "TypeScript client for buns3 object storage, with offline presigned URLs. Runtime-agnostic, zero dependencies.",
+  "keywords": [
+    "buns3",
+    "object-storage",
+    "s3",
+    "presigned-url",
+    "client",
+    "sdk"
+  ],
+  "homepage": "https://github.com/buns3/buns3/tree/main/packages/sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/buns3/buns3.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/buns3/buns3/issues"
+  },
+  "author": "Sebastian Vallin",
+  "sideEffects": false,
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "exports": {
     "require": {
