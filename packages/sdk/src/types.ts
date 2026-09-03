@@ -22,11 +22,23 @@ export interface ApiKey {
   lastUsedAt: string | null;
 }
 
+export interface PutObjectResponse {
+  bucket: string;
+  key: string;
+}
+
 export interface ObjectSummary {
   key: string;
   size: number;
   contentType: string;
   createdAt: string;
+  etag: string;
+}
+
+export interface ObjectMeta {
+  contentType: string;
+  size: number;
+  lastModified: string;
   etag: string;
 }
 
