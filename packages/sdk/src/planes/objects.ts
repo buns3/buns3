@@ -77,6 +77,22 @@ export function parseObjectMeta(
   });
 }
 
+export function putInit(body: BodyInit, contentType?: string) {
+  const headers = new Headers();
+  headers.set(
+    "Content-Type",
+    (contentType ?? (body instanceof Blob ? body.type : "")) ||
+      "application/octet-stream",
+  );
+
+  return {
+    method: "PUT",
+    body,
+    headers,
+    ...(body instanceof ReadableStream ? { duplex: "half" } : {}),
+  } as RequestOptions;
+}
+
 export function createObjects(http: Http) {
   async function get(
     bucket: string,
@@ -109,19 +125,7 @@ export function createObjects(http: Http) {
     const { contentType } = opts;
     const path = route(paths.put, { bucket, key });
 
-    const headers = new Headers();
-    headers.set(
-      "Content-Type",
-      (contentType ?? (body instanceof Blob ? body.type : "")) ||
-        "application/octet-stream",
-    );
-
-    const result = await http.request(path, {
-      method: "PUT",
-      body,
-      headers,
-      ...(body instanceof ReadableStream ? { duplex: "half" } : {}),
-    } as RequestOptions);
+    const result = await http.request(path, putInit(body, contentType));
 
     if (!result.success) return result;
     const json = (await result.data.json()) as PutObjectResponse;

@@ -1,3 +1,4 @@
+import { url } from "arktype/internal/keywords/string.ts";
 import { fromProblem, networkError, ok } from "./result";
 import type { Result } from "./types";
 
@@ -7,7 +8,10 @@ export interface RetryOptions {
   maxDelay: number;
 }
 
-export type RequestOptions = RequestInit & { anonymous?: boolean };
+export type RequestOptions = RequestInit & {
+  anonymous?: boolean;
+  absolute?: boolean;
+};
 
 export type SleepFn = (ms: number) => Promise<void>;
 
@@ -86,7 +90,8 @@ export function createHttp(
     path: string,
     init: Partial<RequestOptions> = {},
   ): Promise<Result<Response>> {
-    const { anonymous, ...fetchInit } = init;
+    const { anonymous, absolute, ...fetchInit } = init;
+    const url = absolute ? path : baseUrl + path;
     const headers = new Headers(fetchInit.headers);
     if (token && !anonymous) {
       headers.set("Authorization", `Bearer ${token}`);
@@ -97,7 +102,7 @@ export function createHttp(
     while (true) {
       let res: Response;
       try {
-        res = await fetch(baseUrl + path, { ...fetchInit, headers });
+        res = await fetch(url, { ...fetchInit, headers });
       } catch (error) {
         if (canRetry && attempt < policy.attempts - 1) {
           await backoff(attempt++);
