@@ -30,11 +30,11 @@ export interface Http {
 export const defaultSleep: SleepFn = (ms) =>
   new Promise((r) => setTimeout(r, ms));
 
-export const defaultRetryPolicy: RetryOptions = {
+export const defaultRetryPolicy = Object.freeze<RetryOptions>({
   attempts: 3,
   baseDelay: 200,
   maxDelay: 2000,
-};
+});
 
 function resolveRetryPolicy(retry: CreateHttpOptions["retry"]): RetryOptions {
   if (retry === undefined) return defaultRetryPolicy;

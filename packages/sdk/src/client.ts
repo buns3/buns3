@@ -15,10 +15,13 @@ import { createSelf } from "./planes/self";
  * What both clients share: the `/_self` plane, which any valid key can reach,
  * and `presigned`, which needs no credentials at all.
  *
- * Not meant to be constructed directly — use {@link Buns3Client} or
- * {@link Buns3AdminClient}. They are separate because no single key works on
- * both planes: an admin key cannot touch objects, and a data key cannot touch
- * `/_admin`, so a combined client would always be half unusable.
+ * Usually you want {@link Buns3Client} or {@link Buns3AdminClient}; this on its
+ * own is a working but limited client. It is also the type to reach for when
+ * you accept either of them.
+ *
+ * They are separate because no single key works on both planes: an admin key
+ * cannot touch objects, and a data key cannot touch `/_admin`, so a combined
+ * client would always be half unusable.
  */
 export class Buns3BaseClient {
   /** Operations on the key you are authenticating with. */
