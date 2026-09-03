@@ -1,4 +1,4 @@
-import type { ErrorCode, ClientErrorCode } from "./error";
+import type { ErrorCode, ClientErrorCode } from "./lib/error";
 
 export interface Bucket {
   name: string;

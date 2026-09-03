@@ -1,4 +1,4 @@
-import { isErrorCode, type ClientErrorCode } from "./error";
+import { isErrorCode, type ClientErrorCode } from "./lib/error";
 import type { Result } from "./types";
 
 export function ok<T>(data: T): Result<T> {
