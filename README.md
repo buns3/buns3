@@ -16,6 +16,9 @@ Built on [Bun](https://bun.com), [Elysia](https://elysiajs.com) 2.0 (beta),
 Prisma Next (RC) and [arktype](https://arktype.io). The stack is intentionally
 bleeding-edge; version pins matter and `latest` tags lie.
 
+The TypeScript client lives in [`packages/sdk`](packages/sdk) and publishes as
+`@buns3/sdk`.
+
 ## Getting started
 
 ```bash
@@ -104,6 +107,25 @@ Errors are RFC 9457 problem+json with a machine-readable `code` field.
 but not allowed; 422 means the request itself is invalid — and validation runs
 before auth, so a malformed bucket name is a 422 even with no credentials
 (S3 does the reverse).
+
+## Client
+
+`@buns3/sdk` wraps all of the above, and signs presigned URLs offline — no
+server round trip, using only `fetch` and WebCrypto, so it runs in a browser or
+a worker as happily as on a server.
+
+```ts
+import { Buns3Client } from "@buns3/sdk";
+
+const client = new Buns3Client("https://buns3.example.com", { token });
+const res = await client.objects.put("photos", "cat.jpg", file);
+
+if (res.success) console.log(res.data.location);
+```
+
+Nothing throws; every call returns a result you narrow on `success`. There are
+two clients, because no key works on both planes. Full docs in
+[`packages/sdk/README.md`](packages/sdk/README.md).
 
 ## Auth
 
@@ -212,12 +234,16 @@ this one) are claims about it.
 ## Development
 
 ```bash
-bun test              # unit tests, ~250ms
+bun test              # 453 tests, ~1.2s, server and SDK
 bun x tsc --noEmit    # Bun does not type-check; this does
 bun run dev           # watch mode on :8000
 ```
 
-Auth changes additionally get a curl matrix — 34 request/response cases
+A Bun workspace: the server at the root, the client in `packages/sdk`. `bun
+test` from the root runs both. Server tests come in two tiers — pure functions,
+and a real SQLite database and filesystem in a throwaway directory per run.
+
+Auth changes additionally get a curl matrix — 47 request/response cases
 pinning every status and error code — before they're believed. The data
 directory (`data/`) is gitignored: databases and blobs don't travel, and
 neither do tokens, which are unrecoverable hashes on any other machine.
