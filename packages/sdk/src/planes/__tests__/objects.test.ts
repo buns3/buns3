@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import type { Http, RequestOptions } from "../http";
+import type { Http, RequestOptions } from "../../http";
 import { createObjects, parseObjectMeta } from "../objects";
-import { ok } from "../result";
-import type { Result } from "../types";
+import { ok } from "../../result";
+import type { Result } from "../../types";
 
 // --- fakes -----------------------------------------------------------------
 

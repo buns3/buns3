@@ -1,13 +1,13 @@
-import type { Http } from "./http";
-import { route } from "./lib/params";
-import { ok } from "./result";
+import type { Http } from "../http";
+import { route } from "../lib/params";
+import { ok } from "../result";
 import type {
   ApiKeysResponse,
   BucketListResponse,
   BucketResponse,
   PostApiKeyResponse,
   Result,
-} from "./types";
+} from "../types";
 
 const bucketsPaths = {
   list: "/_admin/buckets",

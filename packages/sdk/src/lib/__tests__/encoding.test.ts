@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { strictEncode, uriEncodedKey } from "../lib/encoding";
+import { strictEncode, uriEncodedKey } from "../encoding";
 
 // Anchor table: expected strings were produced by the SERVER's src/lib/request.ts
 // (uriEncodedKey) and frozen here. The SDK cannot import the server, so this table

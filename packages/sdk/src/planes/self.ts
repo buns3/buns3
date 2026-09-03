@@ -1,8 +1,8 @@
-import type { Http } from "./http";
-import type { PresignHTTPMethod } from "./lib/presign";
-import { route } from "./lib/params";
-import { ok } from "./result";
-import type { PresignResponse, Result, WhoamiResponse } from "./types";
+import type { Http } from "../http";
+import type { PresignHTTPMethod } from "../lib/presign";
+import { route } from "../lib/params";
+import { ok } from "../result";
+import type { PresignResponse, Result, WhoamiResponse } from "../types";
 
 const paths = {
   whoami: "/_self",

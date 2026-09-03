@@ -1,13 +1,13 @@
-import type { Http, RequestOptions } from "./http";
-import { route } from "./lib/params";
-import { fail, ok } from "./result";
+import type { Http, RequestOptions } from "../http";
+import { route } from "../lib/params";
+import { fail, ok } from "../result";
 import type {
   BatchDelete,
   ObjectList,
   ObjectMeta,
   PutObjectResponse,
   Result,
-} from "./types";
+} from "../types";
 
 const paths = {
   get: "/:bucket/:key*",

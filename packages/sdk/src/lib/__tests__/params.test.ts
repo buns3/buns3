@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { route } from "../lib/params";
+import { route } from "../params";
 
 // The contract: values go in RAW. route() is the only encoder — never pre-encode.
 // (Pre-encoding is the double-encode bug: %20 -> %2520.)

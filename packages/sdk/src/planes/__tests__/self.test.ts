@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import type { Http, RequestOptions } from "../http";
-import { PRESIGN_HTTP_METHODS } from "../lib/presign";
+import type { Http, RequestOptions } from "../../http";
+import { PRESIGN_HTTP_METHODS } from "../../lib/presign";
 import { createSelf } from "../self";
-import { ok } from "../result";
-import type { ApiKey, Result } from "../types";
+import { ok } from "../../result";
+import type { ApiKey, Result } from "../../types";
 
 // --- fakes -----------------------------------------------------------------
 

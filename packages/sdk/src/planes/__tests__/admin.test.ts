@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { createAdmin, createAdminBuckets, createAdminKeys } from "../admin";
-import type { Http, RequestOptions } from "../http";
-import { ok } from "../result";
-import type { ApiKey, BucketWithCount, Result } from "../types";
+import type { Http, RequestOptions } from "../../http";
+import { ok } from "../../result";
+import type { ApiKey, BucketWithCount, Result } from "../../types";
 
 // --- fakes -----------------------------------------------------------------
 
