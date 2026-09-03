@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Http, RequestOptions } from "../../http";
-import { createObjects, parseObjectMeta } from "../objects";
+import { bindBucket, createObjects, parseObjectMeta } from "../objects";
 import { ok } from "../../result";
 import type { Result } from "../../result";
 
@@ -349,5 +349,83 @@ describe("objects.deleteMany", () => {
     const { objects, calls } = fakeHttp(() => ({}));
     await objects.deleteMany("dev", ["a"]);
     expect(typeof last(calls).init!.body).toBe("string");
+  });
+});
+
+// --- bindBucket -------------------------------------------------------------
+
+describe("bindBucket", () => {
+  const scoped = (responder?: (call: Call) => unknown) => {
+    const { http, calls, objects } = fakeHttp(responder);
+    return { calls, bucket: bindBucket(objects, "photos"), objects, http };
+  };
+
+  test("applies the bucket to every method", async () => {
+    const { bucket, calls } = scoped(() =>
+      new Response(JSON.stringify({ bucket: "photos", key: "k" }), {
+        status: 200,
+        headers: META_HEADERS,
+      }),
+    );
+    await bucket.get("cat.jpg");
+    expect(last(calls).path).toBe("/photos/cat.jpg");
+    await bucket.head("cat.jpg");
+    expect(last(calls)).toMatchObject({ path: "/photos/cat.jpg" });
+    await bucket.put("cat.jpg", "x");
+    expect(last(calls).path).toBe("/photos/cat.jpg");
+    await bucket.delete("cat.jpg");
+    expect(last(calls)).toMatchObject({ path: "/photos/cat.jpg" });
+    await bucket.list();
+    expect(last(calls).path).toBe("/photos");
+    await bucket.deleteMany(["a"]);
+    expect(last(calls).path).toBe("/photos");
+  });
+
+  test("exposes exactly the six object methods", () => {
+    const { bucket } = scoped();
+    expect(Object.keys(bucket).sort()).toEqual([
+      "delete",
+      "deleteMany",
+      "get",
+      "head",
+      "list",
+      "put",
+    ]);
+  });
+
+  test("encodes keys the same way the unbound plane does", async () => {
+    const { bucket, objects, calls } = scoped();
+    await bucket.get("a/b c/100%.txt");
+    const bound = last(calls).path;
+    await objects.get("photos", "a/b c/100%.txt");
+    expect(bound).toBe(last(calls).path);
+    expect(bound).toBe("/photos/a/b%20c/100%25.txt");
+  });
+
+  test("forwards options through unchanged", async () => {
+    const { bucket, calls } = scoped(() => ({}));
+    await bucket.get("k", { anonymous: true });
+    expect(last(calls).init).toMatchObject({ anonymous: true });
+    await bucket.list({ prefix: "2026/", limit: 5 });
+    expect(last(calls).path).toBe("/photos?prefix=2026%2F&limit=5");
+  });
+
+  test("methods survive destructuring", async () => {
+    const { bucket, calls } = scoped(() => ({}));
+    const { list } = bucket;
+    await list();
+    expect(last(calls).path).toBe("/photos");
+  });
+
+  test("binding a second bucket does not disturb the first", async () => {
+    const { objects, calls } = scoped(() => ({}));
+    const a = bindBucket(objects, "one");
+    const b = bindBucket(objects, "two");
+    await a.list();
+    expect(last(calls).path).toBe("/one");
+    await b.list();
+    expect(last(calls).path).toBe("/two");
+    await a.list();
+    expect(last(calls).path).toBe("/one");
   });
 });

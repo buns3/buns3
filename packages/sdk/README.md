@@ -89,6 +89,19 @@ do {
 gone come back as `KEY_NOT_FOUND` items rather than failing the batch, so a
 teardown racing another delete still finishes.
 
+If you're only working in one bucket, `bucket()` applies it once:
+
+```ts
+const photos = client.bucket("photos");
+
+await photos.put("cat.jpg", file);
+await photos.list({ prefix: "2026/" });
+```
+
+Same six methods, delegating to the same code. It's a convenience rather than
+a scope: a data key is already bucket-scoped server-side, but tokens are opaque
+so the SDK can't read the bucket from one, and global data keys are planned.
+
 ## Presigned URLs
 
 Two ways to mint one.

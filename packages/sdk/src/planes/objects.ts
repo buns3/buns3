@@ -177,3 +177,25 @@ export function createObjects(http: Http) {
     deleteMany,
   };
 }
+
+export type ObjectsPlane = ReturnType<typeof createObjects>;
+
+/** The object methods with `bucket` already applied. See `Buns3Client.bucket`. */
+export type BucketScope = ReturnType<typeof bindBucket>;
+
+/**
+ * Bind an objects plane to one bucket. Delegates to the same methods, so the
+ * two surfaces cannot drift.
+ */
+export function bindBucket(objects: ObjectsPlane, bucket: string) {
+  return {
+    get: (key: string, opts?: ReadObjectOptions) => objects.get(bucket, key, opts),
+    head: (key: string, opts?: ReadObjectOptions) =>
+      objects.head(bucket, key, opts),
+    put: (key: string, body: BodyInit, opts?: PutObjectOptions) =>
+      objects.put(bucket, key, body, opts),
+    delete: (key: string) => objects.delete(bucket, key),
+    list: (filters?: ListObjectsOptions) => objects.list(bucket, filters),
+    deleteMany: (keys: string[]) => objects.deleteMany(bucket, keys),
+  };
+}

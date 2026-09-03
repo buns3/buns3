@@ -7,7 +7,7 @@ import {
   type PresignOptions,
 } from "./lib/presign";
 import { createAdmin } from "./planes/admin";
-import { createObjects } from "./planes/objects";
+import { bindBucket, createObjects } from "./planes/objects";
 import { createPresigned } from "./planes/presigned";
 import { createSelf } from "./planes/self";
 
@@ -70,6 +70,22 @@ export class Buns3Client extends Buns3BaseClient {
     this.#token = opts.token;
     this.objects = createObjects(this.http);
   }
+
+  /**
+   * The object methods with one bucket already applied, for when you're
+   * working in a single bucket.
+   *
+   * ```ts
+   * const photos = client.bucket("photos");
+   * await photos.put("cat.jpg", file);
+   * await photos.list({ prefix: "2026/" });
+   * ```
+   *
+   * A convenience only: keys stay bucket-scoped on the server, but a token
+   * carries no bucket the SDK could read, and global data keys are a planned
+   * addition. `objects.*` remains the full surface.
+   */
+  readonly bucket = (name: string) => bindBucket(this.objects, name);
 
   /**
    * Mint a presigned URL locally. No network, no server involvement — just the

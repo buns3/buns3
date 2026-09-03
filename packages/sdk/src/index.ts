@@ -8,7 +8,13 @@ export {
   type RetryOptions,
   type RequestOptions,
 } from "./http";
-export { createObjects, parseObjectMeta } from "./planes/objects";
+export {
+  bindBucket,
+  createObjects,
+  parseObjectMeta,
+  type BucketScope,
+  type ObjectsPlane,
+} from "./planes/objects";
 export {
   createAdmin,
   createAdminBuckets,
