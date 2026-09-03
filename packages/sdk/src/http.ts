@@ -7,6 +7,8 @@ export interface RetryOptions {
   maxDelay: number;
 }
 
+export type RequestOptions = RequestInit & { anonymous?: boolean };
+
 export type SleepFn = (ms: number) => Promise<void>;
 
 export interface CreateHttpOptions {
@@ -14,6 +16,12 @@ export interface CreateHttpOptions {
   retry?: Partial<RetryOptions> | false;
   sleep?: SleepFn;
   fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+}
+
+export interface Http {
+  request: (path: string, init?: RequestOptions) => Promise<Result<Response>>;
+
+  requestJson: <T>(path: string, init?: RequestOptions) => Promise<Result<T>>;
 }
 
 export const defaultSleep: SleepFn = (ms) =>
@@ -55,7 +63,10 @@ function parseRetryAfter(header?: string | null) {
   return ms > 0 ? ms : null;
 }
 
-export function createHttp(baseUrl: string, opts: CreateHttpOptions = {}) {
+export function createHttp(
+  baseUrl: string,
+  opts: CreateHttpOptions = {},
+): Http {
   baseUrl = baseUrl.replace(/\/+$/, "");
   const { token, sleep = defaultSleep, fetch = globalThis.fetch } = opts;
   const policy = resolveRetryPolicy(opts.retry);
@@ -73,7 +84,7 @@ export function createHttp(baseUrl: string, opts: CreateHttpOptions = {}) {
 
   async function request(
     path: string,
-    init: RequestInit & { anonymous?: boolean } = {},
+    init: Partial<RequestOptions> = {},
   ): Promise<Result<Response>> {
     const { anonymous, ...fetchInit } = init;
     const headers = new Headers(fetchInit.headers);
@@ -116,7 +127,7 @@ export function createHttp(baseUrl: string, opts: CreateHttpOptions = {}) {
 
   async function requestJson<T>(
     path: string,
-    init: RequestInit & { anonymous?: boolean } = {},
+    init: Partial<RequestOptions> = {},
   ): Promise<Result<T>> {
     const result = await request(path, init);
     if (!result.success) return result;
