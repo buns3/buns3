@@ -10,7 +10,11 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 const ROOT = path.join(tmpdir(), "buns3-test");
-const CACHE_DIR = path.join("node_modules", ".cache", "buns3-test");
+// Template cache lives in the repo (gitignored `.cache/`), NOT in node_modules:
+// `rm -rf node_modules && bun install` is this repo's documented linker fix and
+// must not evict it; %TEMP% is subject to Windows temp sweeps. Run dirs (below)
+// stay in tmpdir — they are per-run garbage and belong there.
+const CACHE_DIR = path.join(".cache", "buns3-test");
 
 // The migration tip hash keys the template cache — migrations change, the
 // hash changes, the stale template is simply never used again.
@@ -40,8 +44,20 @@ process.env.SQLITE_PATH = path.join(runDir, "db.sqlite");
 process.env.DATA_PATH = dataDir;
 
 // Template DB: migrate once per migration tip, file-copy per run.
+//
+// Cold build is ~2s (measured 2026-09-03: CLI startup ~1s + migrate <1s).
+// `prisma` is a PINNED root devDependency so `bun x` resolves node_modules/.bin
+// — zero registry contact, no version drift. An UNPINNED bunx here re-checks
+// the npm registry for `latest` on every cold build: nondeterministic CLI
+// version AND network-dependent latency (the only network step in `bun test`).
+// The build announces itself on stderr so a slow one is visibly slow, never
+// mistaken for a hang.
 if (!existsSync(template)) {
   mkdirSync(CACHE_DIR, { recursive: true });
+  console.error(
+    `tier-2 fixture: building template DB ${path.basename(template)} (once per migration tip, ~2s)...`,
+  );
+  const t0 = performance.now();
   const res = spawnSync("bun", ["x", "prisma", "db", "migrate"], {
     env: { ...process.env, SQLITE_PATH: template },
     stdio: "pipe",
@@ -53,5 +69,8 @@ if (!existsSync(template)) {
       `tier-2 fixture: prisma db migrate failed building template:\n${res.stderr}`,
     );
   }
+  console.error(
+    `tier-2 fixture: template built in ${((performance.now() - t0) / 1000).toFixed(1)}s`,
+  );
 }
 cpSync(template, process.env.SQLITE_PATH);
