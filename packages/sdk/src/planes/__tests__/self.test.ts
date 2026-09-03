@@ -3,7 +3,8 @@ import type { Http, RequestOptions } from "../../http";
 import { PRESIGN_HTTP_METHODS } from "../../lib/presign";
 import { createSelf } from "../self";
 import { ok } from "../../result";
-import type { ApiKey, Result } from "../../types";
+import type { ApiKey } from "../../types";
+import type { Result } from "../../result";
 
 // --- fakes -----------------------------------------------------------------
 

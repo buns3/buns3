@@ -1,8 +1,12 @@
 import type { Http } from "../http";
-import type { PresignOptions } from "../lib/presign";
+
 import { route } from "../lib/params";
-import { ok } from "../result";
-import type { PresignResponse, Result, WhoamiResponse } from "../types";
+import { ok, type Result } from "../result";
+import type {
+  PresignOptions,
+  PresignResponse,
+  WhoamiResponse,
+} from "../types";
 
 const paths = {
   whoami: "/_self",

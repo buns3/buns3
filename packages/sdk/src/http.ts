@@ -1,5 +1,5 @@
 import { fromProblem, networkError, ok } from "./result";
-import type { Result } from "./types";
+import type { Result } from "./result";
 
 export interface RetryOptions {
   attempts: number;

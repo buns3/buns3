@@ -1,12 +1,14 @@
 import type { Http, RequestOptions } from "../http";
 import { route } from "../lib/params";
-import { fail, ok } from "../result";
+import { fail, ok, type Result } from "../result";
 import type {
-  BatchDelete,
-  ObjectList,
+  BatchDeleteResponse,
+  ObjectListResponse,
   ObjectMeta,
   PutObjectResponse,
-  Result,
+  ReadObjectOptions,
+  PutObjectOptions,
+  ListObjectsOptions,
 } from "../types";
 
 const paths = {
@@ -17,20 +19,6 @@ const paths = {
   list: "/:bucket",
   deleteMany: "/:bucket",
 } as const;
-
-export interface GetOptions {
-  anonymous: boolean;
-}
-
-export interface PutOptions {
-  contentType: string;
-}
-
-export interface ListOptions {
-  prefix: string;
-  after: string;
-  limit: number;
-}
 
 export function parseObjectMeta(
   response: Pick<Response, "headers" | "status">,
@@ -97,7 +85,7 @@ export function createObjects(http: Http) {
   async function get(
     bucket: string,
     key: string,
-    opts: Partial<GetOptions> = {},
+    opts: ReadObjectOptions = {},
   ): Promise<Result<Response>> {
     const { anonymous = false } = opts;
     const path = route(paths.get, { bucket, key });
@@ -107,7 +95,7 @@ export function createObjects(http: Http) {
   async function head(
     bucket: string,
     key: string,
-    opts: Partial<GetOptions> = {},
+    opts: ReadObjectOptions = {},
   ): Promise<Result<ObjectMeta>> {
     const { anonymous = false } = opts;
     const path = route(paths.head, { bucket, key });
@@ -120,7 +108,7 @@ export function createObjects(http: Http) {
     bucket: string,
     key: string,
     body: BodyInit,
-    opts: Partial<PutOptions> = {},
+    opts: PutObjectOptions = {},
   ): Promise<Result<PutObjectResponse & { location: string | null }>> {
     const { contentType } = opts;
     const path = route(paths.put, { bucket, key });
@@ -137,8 +125,8 @@ export function createObjects(http: Http) {
 
   async function list(
     bucket: string,
-    filters: Partial<ListOptions> = {},
-  ): Promise<Result<ObjectList>> {
+    filters: ListObjectsOptions = {},
+  ): Promise<Result<ObjectListResponse>> {
     const path = route(paths.list, { bucket });
     const searchParams = new URLSearchParams();
 
@@ -155,7 +143,7 @@ export function createObjects(http: Http) {
     }
 
     const qs = searchParams.toString();
-    return await http.requestJson<ObjectList>(qs ? `${path}?${qs}` : path);
+    return await http.requestJson<ObjectListResponse>(qs ? `${path}?${qs}` : path);
   }
 
   async function deleteObject(
@@ -171,9 +159,9 @@ export function createObjects(http: Http) {
   async function deleteMany(
     bucket: string,
     keys: string[],
-  ): Promise<Result<BatchDelete>> {
+  ): Promise<Result<BatchDeleteResponse>> {
     const path = route(paths.deleteMany, { bucket });
-    return await http.requestJson<BatchDelete>(path, {
+    return await http.requestJson<BatchDeleteResponse>(path, {
       method: "DELETE",
       body: JSON.stringify({ keys }),
       headers: { "Content-Type": "application/json" },

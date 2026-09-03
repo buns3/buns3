@@ -1,12 +1,13 @@
 import type { Http } from "../http";
 import { route } from "../lib/params";
-import { ok } from "../result";
+import { ok, type Result } from "../result";
 import type {
-  ApiKeysResponse,
+  ApiKeyListResponse,
   BucketListResponse,
   BucketResponse,
-  PostApiKeyResponse,
-  Result,
+  CreateApiKeyResponse,
+  UpdateBucketOptions,
+  CreateApiKeyOptions,
 } from "../types";
 
 const bucketsPaths = {
@@ -22,26 +23,6 @@ const keysPaths = {
   create: "/_admin/keys",
   delete: "/_admin/keys/:id",
 } as const;
-
-export interface UpdateBucketOptions {
-  publicRead: boolean;
-}
-
-export type CreateApiKeyOptions =
-  | {
-      name: string;
-      bucketName: null;
-      canRead: false;
-      canWrite: false;
-      isAdmin: true;
-    }
-  | {
-      name: string;
-      bucketName: string;
-      canRead: boolean;
-      canWrite: boolean;
-      isAdmin: false;
-    };
 
 export function createAdminBuckets(http: Http) {
   async function list(): Promise<Result<BucketListResponse>> {
@@ -69,7 +50,7 @@ export function createAdminBuckets(http: Http) {
 
   async function update(
     bucket: string,
-    opts: Partial<UpdateBucketOptions>,
+    opts: UpdateBucketOptions,
   ): Promise<Result<BucketResponse>> {
     const path = route(bucketsPaths.update, { bucket });
     return await http.requestJson<BucketResponse>(path, {
@@ -96,16 +77,16 @@ export function createAdminBuckets(http: Http) {
 }
 
 export function createAdminKeys(http: Http) {
-  async function list(): Promise<Result<ApiKeysResponse>> {
+  async function list(): Promise<Result<ApiKeyListResponse>> {
     const path = route(keysPaths.list, {});
-    return await http.requestJson<ApiKeysResponse>(path);
+    return await http.requestJson<ApiKeyListResponse>(path);
   }
 
   async function create(
     opts: CreateApiKeyOptions,
-  ): Promise<Result<PostApiKeyResponse>> {
+  ): Promise<Result<CreateApiKeyResponse>> {
     const path = route(keysPaths.create, {});
-    return http.requestJson<PostApiKeyResponse>(path, {
+    return http.requestJson<CreateApiKeyResponse>(path, {
       method: "POST",
       body: JSON.stringify(opts),
       headers: { "Content-Type": "application/json" },

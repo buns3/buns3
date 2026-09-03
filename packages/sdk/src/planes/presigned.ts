@@ -1,7 +1,11 @@
-import { ok } from "../result";
+import { ok, type Result } from "../result";
 import type { Http } from "../http";
-import type { ObjectMeta, PutObjectResponse, Result } from "../types";
-import { parseObjectMeta, putInit, type PutOptions } from "./objects";
+import type {
+  ObjectMeta,
+  PutObjectOptions,
+  PutObjectResponse,
+} from "../types";
+import { parseObjectMeta, putInit } from "./objects";
 
 const presignInit = {
   absolute: true,
@@ -25,7 +29,7 @@ export function createPresigned(http: Http) {
   async function put(
     url: string,
     body: BodyInit,
-    opts: Partial<PutOptions> = {},
+    opts: PutObjectOptions = {},
   ): Promise<Result<PutObjectResponse & { location: string | null }>> {
     const { contentType } = opts;
     const result = await http.request(url, {
