@@ -1,7 +1,8 @@
 # buns3
 
-A small S3-like object storage server. Buckets, objects, API keys, presigned
-URLs, listing — streamed to disk, metadata in SQLite, one process.
+A small S3-like object storage server, and a TypeScript client for it.
+Buckets, objects, API keys, presigned URLs, listing — streamed to disk,
+metadata in SQLite, one process.
 
 Pronounced "bun-ess-three". Other pronunciations exist and are wrong, which
 has never stopped anyone.
@@ -16,10 +17,31 @@ Built on [Bun](https://bun.com), [Elysia](https://elysiajs.com) 2.0 (beta),
 Prisma Next (RC) and [arktype](https://arktype.io). The stack is intentionally
 bleeding-edge; version pins matter and `latest` tags lie.
 
-The TypeScript client lives in [`packages/sdk`](packages/sdk) and publishes as
-`@buns3/sdk`.
+## The client
 
-## Getting started
+If you just want to talk to a buns3 server, install
+[`@buns3/sdk`](packages/sdk) and skip the rest of this page:
+
+```bash
+bun add @buns3/sdk
+```
+
+```ts
+import { Buns3Client } from "@buns3/sdk";
+
+const client = new Buns3Client("https://buns3.example.com", { token });
+const res = await client.objects.put("photos", "cat.jpg", file);
+
+if (res.success) console.log(res.data.location);
+```
+
+It signs presigned URLs offline — no server round trip, `fetch` and WebCrypto
+only, so it runs in a browser or a worker as happily as on a server. Nothing
+throws; every call returns a result you narrow on `success`. There are two
+clients, because no key works on both planes. Full docs in
+[`packages/sdk/README.md`](packages/sdk/README.md).
+
+## Running a server
 
 ```bash
 bun install
@@ -107,25 +129,6 @@ Errors are RFC 9457 problem+json with a machine-readable `code` field.
 but not allowed; 422 means the request itself is invalid — and validation runs
 before auth, so a malformed bucket name is a 422 even with no credentials
 (S3 does the reverse).
-
-## Client
-
-`@buns3/sdk` wraps all of the above, and signs presigned URLs offline — no
-server round trip, using only `fetch` and WebCrypto, so it runs in a browser or
-a worker as happily as on a server.
-
-```ts
-import { Buns3Client } from "@buns3/sdk";
-
-const client = new Buns3Client("https://buns3.example.com", { token });
-const res = await client.objects.put("photos", "cat.jpg", file);
-
-if (res.success) console.log(res.data.location);
-```
-
-Nothing throws; every call returns a result you narrow on `success`. There are
-two clients, because no key works on both planes. Full docs in
-[`packages/sdk/README.md`](packages/sdk/README.md).
 
 ## Auth
 
