@@ -26,6 +26,15 @@ export interface WhoamiResponse {
   apiKey: ApiKey | null;
 }
 
+export interface ApiKeysResponse {
+  apiKeys: ApiKey[];
+}
+
+export interface PostApiKeyResponse {
+  apiKey: ApiKey;
+  token: string;
+}
+
 export interface PutObjectResponse {
   bucket: string;
   key: string;
@@ -58,6 +67,14 @@ export interface ObjectList {
   count: number;
   nextAfter: string | null;
   objects: ObjectSummary[];
+}
+
+export interface BucketListResponse {
+  buckets: BucketWithCount[];
+}
+
+export interface BucketResponse {
+  bucket: BucketWithCount;
 }
 
 export type BatchDeleteItem =
