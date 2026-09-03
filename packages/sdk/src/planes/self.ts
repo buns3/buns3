@@ -1,5 +1,5 @@
 import type { Http } from "../http";
-import type { PresignHTTPMethod } from "../lib/presign";
+import type { PresignOptions } from "../lib/presign";
 import { route } from "../lib/params";
 import { ok } from "../result";
 import type { PresignResponse, Result, WhoamiResponse } from "../types";
@@ -9,13 +9,6 @@ const paths = {
   revoke: "/_self",
   presign: "/_self/presign",
 } as const;
-
-export interface PresignOptions {
-  method: PresignHTTPMethod;
-  bucket: string;
-  key: string;
-  ttl: number;
-}
 
 export function createSelf(http: Http) {
   async function whoami(): Promise<Result<WhoamiResponse>> {

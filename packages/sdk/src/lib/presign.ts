@@ -17,6 +17,13 @@ export interface SignOptions extends CanonicalStringOptions {
   tokenHash: string;
 }
 
+export interface PresignOptions {
+  method: PresignHTTPMethod;
+  bucket: string;
+  key: string;
+  ttl: number;
+}
+
 async function hmacHex(keyString: string, message: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
