@@ -22,6 +22,10 @@ export interface ApiKey {
   lastUsedAt: string | null;
 }
 
+export interface WhoamiResponse {
+  apiKey: ApiKey | null;
+}
+
 export interface PutObjectResponse {
   bucket: string;
   key: string;
@@ -64,6 +68,11 @@ export interface BatchDelete {
   bucket: string;
   results: BatchDeleteItem[];
   summary: { deleted: number; missing: number };
+}
+
+export interface PresignResponse {
+  url: string;
+  expires: number;
 }
 
 export interface Problem {
