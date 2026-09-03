@@ -1,2 +1,11 @@
+# hoisted, NOT isolated: the isolated linker builds node_modules out of
+# junctions, and Windows Redirection Guard makes SSH-spawned processes refuse to
+# traverse user-created junctions ("untrusted mount point") — every workspace
+# package became invisible to Remote-SSH terminals and the TS server. Plain
+# directories work in every session type. Switching linkers on a live
+# node_modules leaves a half-migrated tree: rm -rf node_modules && bun install.
+[install]
+linker = "hoisted"
+
 [test]
 preload = ["./test/preload.ts"]
