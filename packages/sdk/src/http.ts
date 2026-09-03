@@ -1,4 +1,3 @@
-import { url } from "arktype/internal/keywords/string.ts";
 import { fromProblem, networkError, ok } from "./result";
 import type { Result } from "./types";
 
