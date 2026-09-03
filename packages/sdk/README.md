@@ -3,11 +3,14 @@
 The TypeScript client for [buns3](https://github.com/buns3/buns3). Objects,
 buckets, keys, and presigned URLs you can mint offline.
 
-Runs anywhere there's `fetch` and WebCrypto — browsers, Bun, Node, Deno, edge
-runtimes. No runtime dependencies, and a test enforces that.
+**The "bun" in the name is the server, not the client.** This package needs
+`fetch` and WebCrypto and nothing else, so it runs on Node, Deno, Bun, in
+browsers, and in edge runtimes. No runtime dependencies, and a test enforces
+that.
 
 ```bash
-bun add @buns3/sdk
+npm install @buns3/sdk
+# or: bun add / pnpm add / yarn add
 ```
 
 ## Getting started

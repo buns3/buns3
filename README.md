@@ -23,7 +23,8 @@ If you just want to talk to a buns3 server, install
 [`@buns3/sdk`](packages/sdk) and skip the rest of this page:
 
 ```bash
-bun add @buns3/sdk
+npm install @buns3/sdk
+# or: bun add / pnpm add / yarn add
 ```
 
 ```ts
@@ -35,10 +36,12 @@ const res = await client.objects.put("photos", "cat.jpg", file);
 if (res.success) console.log(res.data.location);
 ```
 
-It signs presigned URLs offline — no server round trip, `fetch` and WebCrypto
-only, so it runs in a browser or a worker as happily as on a server. Nothing
-throws; every call returns a result you narrow on `success`. There are two
-clients, because no key works on both planes. Full docs in
+Only the server needs Bun. The client runs on Node, Deno, Bun, in browsers and
+in edge runtimes — it uses `fetch` and WebCrypto and has no dependencies. That
+includes signing presigned URLs offline, with no server round trip.
+
+Nothing throws; every call returns a result you narrow on `success`. There are
+two clients, because no key works on both planes. Full docs in
 [`packages/sdk/README.md`](packages/sdk/README.md).
 
 ## Running a server
