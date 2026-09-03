@@ -23,7 +23,8 @@
     "build": "tsdown"
   },
   "devDependencies": {
-    "tsdown": "0.22.14"
+    "tsdown": "0.22.14",
+    "@types/bun": "catalog:dev"
   },
   "peerDependencies": {
     "typescript": "catalog:dev"

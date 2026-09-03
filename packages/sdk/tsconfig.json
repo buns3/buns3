@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "outDir": "./dist",
+    "rootDir": "./src",
     "declaration": true,
 
     // Environment setup & latest features
@@ -10,6 +11,7 @@
     "moduleDetection": "force",
     "jsx": "react-jsx",
     "allowJs": true,
+    "types": [],
 
     // Bundler mode
     "moduleResolution": "bundler",
@@ -32,5 +34,7 @@
     "paths": {
       "$/*": ["./src/*"]
     }
-  }
+  },
+  "include": ["./src"],
+  "exclude": ["./src/**/*.test.ts"]
 }
