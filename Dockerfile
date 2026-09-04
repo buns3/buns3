@@ -12,7 +12,7 @@ COPY prisma.config.ts ./
 COPY src/modules/prisma/ ./src/modules/prisma
 ENV DO_NOT_TRACK=1
 USER bun
-CMD ["bunx", "prisma", "db", "migrate", "--advance-ref", "db"]
+CMD ["bunx", "prisma", "db", "migrate"]
 
 FROM base AS runtime
 RUN bun install --production --frozen-lockfile
