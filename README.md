@@ -266,6 +266,13 @@ consulting whether the target exists. Stray requests under `_`-prefixed paths
 fail bucket-name validation (422) without any lookup — real S3 answers the
 same probe with 404 `NoSuchBucket`, existence disclosed.
 
+**`/favicon.ico` is the one un-prefixed root route.** Every non-bucket route
+takes a `_` prefix so a bucket name can never shadow it — but browsers ask for
+`/favicon.ico` by that exact name, and it would otherwise be read as a bucket
+and rejected with a 422. It answers 204. The exception is safe rather than
+convenient: `favicon.ico` contains a dot, so it can never be a valid bucket
+name and cannot collide with one.
+
 **HEAD exists only for objects.** It's the one endpoint where the body is
 expensive to send; everything else returns small JSON, so GET is the answer.
 HEAD on an object agrees with GET about existence — if GET would 404, so does
