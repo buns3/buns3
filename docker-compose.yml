@@ -1,0 +1,36 @@
+services:
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrate
+    environment:
+      - DO_NOT_TRACK=1
+      - SQLITE_PATH=/data/db.sqlite
+    volumes:
+      - buns3-data:/data
+    restart: no
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    environment:
+      - BASE_URL=${BASE_URL:?set BASE_URL}
+    volumes:
+      - buns3-data:/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    init: true
+    healthcheck:
+      test: bun -e "const r = await fetch('http://localhost:'+(process.env.PORT??8000)); if(!r.ok) process.exit(1)" || exit 1
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  buns3-data:

@@ -1,0 +1,30 @@
+# Dependencies / build output / caches — regenerated inside the image.
+**/node_modules
+**/dist
+
+# Secrets and local env — runtime env is injected by Dokploy/compose.
+**/.env
+**/.env.*
+!**/.env.example
+
+# Repo metadata, tooling, docs — not needed at build/runtime.
+.git
+.gitignore
+.claude
+.mcp.json
+**/*.md
+**/.DS_Store
+
+# packages - not needed for the server
+/packages
+
+# Runtime data — the DB and blobs live on a volume, never in the image.
+/data
+
+# Misc files
+/tools
+/bunfig.toml
+
+# Tests never run in the image.
+**/__tests__
+/test
