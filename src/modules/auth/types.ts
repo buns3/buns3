@@ -44,6 +44,8 @@ export type AuthState =
   | { kind: "presign"; params: PresignParams }
   | { kind: "anonymous" };
 
+export type AuthKind = AuthState["kind"];
+
 export type AuthorizeOptions = {
   state: AuthState;
   capability?: AuthorizeCapability;
