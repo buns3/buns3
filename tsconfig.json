@@ -34,5 +34,10 @@
   // Each workspace typechecks itself (packages/sdk has its own lib/types: DOM,
   // no Bun globals). Without this the root config compiles packages/** under
   // the SERVER's lib and fails on the SDK's DOM types.
-  "exclude": ["node_modules", "packages"]
+  "exclude": [
+    "node_modules",
+    "packages",
+    // Needs DOM for the SDK sources it imports — see tsconfig.integration.json
+    "src/modules/http/__tests__/sdk-integration.test.ts"
+  ]
 }

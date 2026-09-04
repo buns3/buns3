@@ -1,0 +1,13 @@
+{
+  // The SDK<->server integration test imports SDK sources, which are written
+  // against the DOM lib (fetch, Response, BodyInit) rather than Bun's types.
+  // The root config deliberately stays narrow — a browser global in server
+  // code should be a compile error — so this config typechecks that one file
+  // with both type environments available.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM"]
+  },
+  "include": ["src/modules/http/__tests__/sdk-integration.test.ts"],
+  "exclude": []
+}
