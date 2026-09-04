@@ -124,7 +124,18 @@ iptables rules. Local port publishing belongs in a gitignored
 `docker-compose.override.yml`.
 
 **Raise the proxy's body limit to 5 GB**, or large uploads fail at the proxy
-with an error that looks like it came from buns3.
+with an error that looks like it came from buns3. Note that a CDN may impose
+its own limit you can't raise: Cloudflare caps request bodies at 100 MB on its
+Free and Pro plans, which is a ceiling on uploads regardless of what buns3 and
+your proxy allow. Downloads aren't affected — response size is unlimited.
+
+**A CDN in front will cache objects, and buns3 doesn't currently tell it not
+to.** No `Cache-Control` is sent on object responses, so the CDN applies its own
+default — Cloudflare caches static file types for four hours out of the box.
+That means making a bucket private, or deleting an object, does **not** stop the
+cached copy being served, and a presigned URL can outlive its own expiry because
+the signature is never re-checked. Until buns3 sends the header itself, either
+put a bypass-cache rule in front of the data plane or purge on access changes.
 
 **One instance.** SQLite and local blobs mean a second replica corrupts the
 first. That's a property of the design, not an oversight — see the decisions
