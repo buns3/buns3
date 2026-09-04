@@ -33,7 +33,13 @@ export function createServer() {
     )
 
     .get("/", () => ({ message: "OK" }))
-    .get("/favicon.ico", new Response(null, { status: 204 }))
+    .get(
+      "/favicon.ico",
+      new Response(null, {
+        status: 204,
+        headers: { "cache-control": "public, max-age=86400" },
+      }),
+    )
 
     .use(objectsRoutes)
     .use(apiKeyRoutes)
