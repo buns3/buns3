@@ -56,7 +56,11 @@ Create a `.env`:
 PORT=8000
 SQLITE_PATH=./data/db.sqlite
 BASE_URL=http://localhost:8000
+OPENAPI=1
 ```
+
+`OPENAPI=1` serves an interactive API reference at `/_openapi`, covering the
+admin, self and server planes. Leave it out in production — see the ledger.
 
 Apply migrations, mint the first admin key, start the server:
 
@@ -158,6 +162,10 @@ admin that needs to read or write mints itself a data key.
 presented: any valid key may introspect itself, revoke itself, or presign for
 itself.
 
+**`GET /_server`** sits outside the three. It describes the server rather than
+a resource, so any valid key can read it — but not an anonymous one: a
+deployment does not advertise its build to the internet.
+
 Bucket names match `^[a-z][a-z0-9-]*$` (max 20 chars), which structurally
 reserves the `_` prefix for non-bucket routes. Object keys are any non-control
 characters up to 1024, defined after percent-decoding — clients must encode.
@@ -195,6 +203,12 @@ characters up to 1024, defined after percent-decoding — clients must encode.
 | `GET /_self` | Who am I — the presented key, mapped, no secrets. |
 | `DELETE /_self` | Revoke the presented key. Any key may destroy itself. |
 | `POST /_self/presign` | `{"method", "bucket", "key", "ttl"}` → a presigned URL. A key can only presign operations it could perform itself. |
+
+### Server
+
+| | |
+|---|---|
+| `GET /_server` | What this server is: `{"version"}`. Any valid key, admin or not. |
 
 Errors are RFC 9457 problem+json with a machine-readable `code` field.
 401 means missing, malformed, or unknown credentials; 403 means authenticated
@@ -316,6 +330,27 @@ Duplicates in the request are deduped silently. Blob file cleanup is
 best-effort after the pointers are gone — a failed unlink is a logged orphan,
 never a client error.
 
+**The server and the SDK carry one version number.** `@buns3/sdk` 0.2.0 speaks
+to buns3 0.2.0, and a test fails the build if the two manifests disagree. The
+alternative — independent versions with a documented compatibility range —
+writes the invariant in prose that nothing checks. The SDK deliberately does
+not warn about a mismatch at runtime: during any deploy the two are briefly
+different, so the warning would fire in normal operation and be tuned out, and
+a client cannot fix a version skew anyway. `GET /_server` is there for when a
+human wants to ask.
+
+**Destructive migrations are a one-way door.** Migrations run forward before
+the server starts, so rolling the code back means old code against a newer
+schema. Additive changes survive that; a dropped or renamed column does not.
+Anything that has to stay rollback-able is staged across two releases — add and
+backfill first, drop only once the previous version is no longer a target.
+
+**API docs are opt-in.** `/_openapi` is disabled unless `OPENAPI=1` is set. The
+flag is positive on purpose, so an unset variable means off rather than on. The
+page pulls a documentation bundle from a public CDN at an unpinned version —
+third-party JavaScript executing on the same origin as your objects, which is
+fine on a laptop and not on a deployment.
+
 **One bug, one lesson.** Every gotcha this project has hit — beta framework
 lies, ORM codec surprises, timezone skews — is written into `CLAUDE.md` with
 the probe that proved it. The wire is the source of truth; the docs (including
@@ -324,7 +359,7 @@ this one) are claims about it.
 ## Development
 
 ```bash
-bun test              # 453 tests, ~1.2s, server and SDK
+bun test              # 517 tests, ~2.5s, server and SDK
 bun x tsc --noEmit    # Bun does not type-check; this does
 bun run dev           # watch mode on :8000
 ```

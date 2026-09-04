@@ -19,6 +19,8 @@ import {
   sign,
 } from "../../../../packages/sdk/src/lib/presign";
 import { ERROR_CODES } from "../../../../packages/sdk/src/lib/error";
+import { createServer as createServerPlane } from "../../../../packages/sdk/src/planes/server";
+import { version as SDK_VERSION } from "../../../../packages/sdk/package.json";
 
 import {
   API_KEY_ERROR_CODES,
@@ -552,6 +554,59 @@ describe("admin plane", () => {
     expect(await createAdmin(sdk(token)).buckets.list()).toMatchObject({
       success: false,
       status: 403,
+    });
+  });
+});
+
+describe("the server plane", () => {
+  test("reports the version the SDK itself ships with", async () => {
+    // test/version.test.ts pins that the two manifests agree. This is the same
+    // invariant from where a consumer stands: what arrives over the wire is
+    // what the installed package claims to be.
+    const { token } = await seedKey({ name: "admin", isAdmin: true });
+
+    const res = await createServerPlane(sdk(token)).get();
+    expect(res.success).toBe(true);
+    if (!res.success) return;
+    expect(res.data.version).toBe(SDK_VERSION);
+  });
+
+  test("the response is exactly { version }", async () => {
+    // An earlier draft returned { full, major, minor, patch }, where a
+    // prerelease tag serialised patch to null. toEqual is exact, so going back
+    // to that shape fails here rather than in a consumer.
+    const { token } = await seedKey({ name: "admin", isAdmin: true });
+
+    const res = await createServerPlane(sdk(token)).get();
+    expect(res.success).toBe(true);
+    if (!res.success) return;
+    expect(res.data).toEqual({ version: expect.any(String) });
+  });
+
+  test("any valid key reaches it, not just admin", async () => {
+    // It lived on /_admin first. A data key must be able to ask what it is
+    // talking to, or the SDK could never use this.
+    await seedBucket("dev");
+    const { token } = await seedKey({
+      name: "reader",
+      bucketName: "dev",
+      canRead: true,
+    });
+
+    expect(await createServerPlane(sdk(token)).get()).toMatchObject({
+      success: true,
+    });
+  });
+
+  test.each([
+    ["no token", undefined],
+    ["unknown token", "buns3_notarealtokenatall"],
+  ])("%s gets 401 INVALID_API_KEY", async (_label, token) => {
+    // The build is not advertised to anonymous callers.
+    expect(await createServerPlane(sdk(token)).get()).toMatchObject({
+      success: false,
+      status: 401,
+      code: "INVALID_API_KEY",
     });
   });
 });

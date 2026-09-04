@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "license": "MIT",
+  "version": "0.1.0",
   "scripts": {
     "dev": "bun --watch ./src",
     "prisma:studio": "cd .. && bunx prisma@7 studio --url \"file://$SQLITE_PATH\""

@@ -8,3 +8,4 @@ export type * from "./api-key";
 export type * from "./bucket";
 export type * from "./object";
 export type * from "./presign";
+export type * from "./server";

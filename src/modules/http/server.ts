@@ -5,6 +5,8 @@ import { apiKeyRoutes } from "./routes/api-key.routes";
 import { objectsRoutes } from "./routes/objects.routes";
 import { bucketsRoutes } from "./routes/buckets.routes";
 import { selfRoutes } from "./routes/self.routes";
+import { serverRoutes } from "./routes/server.routes";
+import { VERSION } from "$/lib/version";
 
 export function createServer() {
   return new Elysia({
@@ -13,6 +15,7 @@ export function createServer() {
     .use(useErrorHandler)
     .use(
       openapi({
+        enabled: process.env.OPENAPI === "1",
         path: "/_openapi",
         exclude: {
           paths: ["/:bucket/*", "/:bucket"],
@@ -44,11 +47,12 @@ export function createServer() {
     .use(objectsRoutes)
     .use(apiKeyRoutes)
     .use(bucketsRoutes)
-    .use(selfRoutes);
+    .use(selfRoutes)
+    .use(serverRoutes);
 }
 
 export function initServer() {
   const app = createServer().listen(process.env.PORT ?? 8000);
-  console.log("HTTP server started at", app.server?.url.href);
+  console.log("HTTP server started at", app.server?.url.href, `(v${VERSION})`);
   return app;
 }

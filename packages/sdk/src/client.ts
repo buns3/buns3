@@ -10,6 +10,7 @@ import { createAdmin } from "./planes/admin";
 import { bindBucket, createObjects } from "./planes/objects";
 import { createPresigned } from "./planes/presigned";
 import { createSelf } from "./planes/self";
+import { createServer } from "./planes/server";
 
 /**
  * What both clients share: the `/_self` plane, which any valid key can reach,
@@ -28,6 +29,8 @@ export class Buns3BaseClient {
   readonly self;
   /** Follow a presigned URL. Sends no credentials, so any client can use it. */
   readonly presigned;
+  /** Facts about the server itself. Any valid key can read it — not just admin. */
+  readonly server;
 
   readonly #baseUrl: string;
   readonly #http: Http;
@@ -44,6 +47,7 @@ export class Buns3BaseClient {
     this.#http = createHttp(this.#baseUrl, opts);
     this.self = createSelf(this.#http);
     this.presigned = createPresigned(this.#http);
+    this.server = createServer(this.#http);
   }
 }
 
