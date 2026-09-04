@@ -9,7 +9,7 @@ async function shutdown() {
 
 await fileStorage.init();
 
-const server = await initServer();
+const server = initServer();
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

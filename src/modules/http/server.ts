@@ -6,8 +6,8 @@ import { objectsRoutes } from "./routes/objects.routes";
 import { bucketsRoutes } from "./routes/buckets.routes";
 import { selfRoutes } from "./routes/self.routes";
 
-export async function initServer() {
-  const app = new Elysia({
+export function createServer() {
+  return new Elysia({
     serve: { maxRequestBodySize: 5 * 1024 ** 3 },
   })
     .use(useErrorHandler)
@@ -37,10 +37,11 @@ export async function initServer() {
     .use(objectsRoutes)
     .use(apiKeyRoutes)
     .use(bucketsRoutes)
-    .use(selfRoutes)
+    .use(selfRoutes);
+}
 
-    .listen(process.env.PORT ?? 8000);
-
+export function initServer() {
+  const app = createServer().listen(process.env.PORT ?? 8000);
   console.log("HTTP server started at", app.server?.url.href);
   return app;
 }
