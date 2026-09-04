@@ -24,6 +24,9 @@
   },
   "author": "Sebastian Vallin",
   "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
   "files": [
     "dist",
     "README.md",
