@@ -74,6 +74,62 @@ with the admin key.
 browser consoles for the data plane and the control plane. Upload them into a
 public bucket with `Content-Type: text/html` and they serve themselves.
 
+## Deploying
+
+There's a multi-stage `Dockerfile` and a `docker-compose.yml`. Set `BASE_URL`
+and bring it up:
+
+```bash
+echo "BASE_URL=https://buns3.example.com" > .env
+docker compose up -d
+```
+
+Two images come out of the one Dockerfile. `migrate` carries the Prisma CLI and
+exits; `runtime` serves and doesn't. That split is worth the extra target: a
+full install is 964 MB because the CLI pulls in Prisma's cloud tooling, against
+131 MB for the server's actual dependencies.
+
+Migrations run as a one-shot before the server starts, and the server waits for
+them to succeed. They can't run at build time — the database lives on the
+volume, which doesn't exist yet — and running them after the server is up would
+mean serving on a schema that isn't there. Re-running is safe; the database's
+marker table decides what's pending.
+
+One volume, mounted at `/data` by both services. The database, the blobs and
+the `.tmp` staging directory have to share a filesystem, because uploads are
+written to `.tmp` and renamed into place, and rename is only atomic within one
+filesystem. Splitting them would corrupt uploads rather than produce an error.
+
+Both containers run as the unprivileged `bun` user. Ownership of a named volume
+is inherited from the image at creation time, so a volume created before this
+was true stays root-owned and has to be recreated.
+
+Mint the first admin key inside the container:
+
+```bash
+docker compose exec server bun scripts/create-key.ts --name admin --admin
+```
+
+### Things to get right
+
+**`BASE_URL` must be the public origin** — scheme and host, no trailing path.
+Presigned URLs are minted against it by string concatenation, so a path-prefixed
+deployment produces URLs that 404. There's no default on purpose: a wrong value
+fails quietly, so an unset one fails loudly instead.
+
+**Don't publish the container's port** if a reverse proxy fronts it. A published
+port bypasses the proxy entirely — no TLS, and API tokens travel in cleartext.
+Note that a published port also bypasses `ufw`, since Docker writes its own
+iptables rules. Local port publishing belongs in a gitignored
+`docker-compose.override.yml`.
+
+**Raise the proxy's body limit to 5 GB**, or large uploads fail at the proxy
+with an error that looks like it came from buns3.
+
+**One instance.** SQLite and local blobs mean a second replica corrupts the
+first. That's a property of the design, not an oversight — see the decisions
+below.
+
 ## The three planes
 
 Every route belongs to exactly one plane, and each plane has one auth rule.
