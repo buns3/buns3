@@ -2,9 +2,10 @@ import Elysia, { status } from "elysia";
 import { useAuth, useBucket, useBucketKey } from "../middleware";
 import { unwrap, validate } from "$/lib/error";
 import { fileStorage } from "$/modules/storage/file-storage";
-import { applyObjectHeaders } from "../headers";
+import { applyPayloadHeaders, applyValidatorHeaders } from "../headers";
 import { uriEncodedKey } from "$/lib/request";
 import { BatchDelete, ObjectListQuery } from "$/modules/validation/object";
+import { etagMatches } from "$/lib/etag";
 
 export const objectsRoutes = new Elysia({
   name: "routes:objects",
@@ -54,9 +55,16 @@ export const objectsRoutes = new Elysia({
       .get(
         "",
         { auth: "read", bucketKey: true },
-        async ({ set, bucket, key }) => {
+        async ({ set, bucket, key, authState, headers }) => {
+          const ifNoneMatch = headers["if-none-match"];
           const { file, object } = unwrap(await fileStorage.get(bucket, key));
-          applyObjectHeaders(set.headers, object);
+
+          applyValidatorHeaders(set.headers, object, authState.kind);
+          if (ifNoneMatch && etagMatches(ifNoneMatch, `"${object.id}"`)) {
+            return status(304, null);
+          }
+
+          applyPayloadHeaders(set.headers, object);
           return file;
         },
       )
@@ -99,9 +107,16 @@ export const objectsRoutes = new Elysia({
       .head(
         "",
         { auth: "read", bucketKey: true },
-        async ({ set, bucket, key }) => {
+        async ({ set, bucket, key, authState, headers }) => {
+          const ifNoneMatch = headers["if-none-match"];
           const { object } = unwrap(await fileStorage.get(bucket, key));
-          applyObjectHeaders(set.headers, object);
+
+          applyValidatorHeaders(set.headers, object, authState.kind);
+          if (ifNoneMatch && etagMatches(ifNoneMatch, `"${object.id}"`)) {
+            return status(304, null);
+          }
+
+          applyPayloadHeaders(set.headers, object);
           set.headers["content-length"] = String(object.size);
         },
       ),
