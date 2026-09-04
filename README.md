@@ -129,13 +129,15 @@ its own limit you can't raise: Cloudflare caps request bodies at 100 MB on its
 Free and Pro plans, which is a ceiling on uploads regardless of what buns3 and
 your proxy allow. Downloads aren't affected — response size is unlimited.
 
-**A CDN in front will cache objects, and buns3 doesn't currently tell it not
-to.** No `Cache-Control` is sent on object responses, so the CDN applies its own
-default — Cloudflare caches static file types for four hours out of the box.
-That means making a bucket private, or deleting an object, does **not** stop the
-cached copy being served, and a presigned URL can outlive its own expiry because
-the signature is never re-checked. Until buns3 sends the header itself, either
-put a bypass-cache rule in front of the data plane or purge on access changes.
+**A CDN in front will cache public objects, which is intended.** buns3 sends
+`Cache-Control` on every object response, chosen by how the request was
+authorized: `public, max-age=60` when the read was anonymous — which is only
+possible on a public-read bucket — and `private, no-store` whenever a key or a
+signature was involved. So a CDN caches exactly the content that has no access
+control, and never holds a response that required credentials. Sixty seconds is
+short deliberately, because keys are mutable: it's how long an overwrite stays
+invisible. Revalidation is cheap, since a matching `If-None-Match` gets a 304
+of about 200 bytes rather than the object.
 
 **One instance.** SQLite and local blobs mean a second replica corrupts the
 first. That's a property of the design, not an oversight — see the decisions
@@ -167,7 +169,7 @@ characters up to 1024, defined after percent-decoding — clients must encode.
 | | |
 |---|---|
 | `PUT /:bucket/:key` | Store an object. 201 with a `Location` header; overwrite is also 201. Empty bodies allowed. `Content-Type` is stored verbatim — no sniffing. Max 5 GB. |
-| `GET /:bucket/:key` | The object, with stored content type, `Last-Modified`, `ETag`, and range support. |
+| `GET /:bucket/:key` | The object, with stored content type, `Last-Modified`, `ETag`, range support and conditional requests — a matching `If-None-Match` gets a 304. |
 | `HEAD /:bucket/:key` | Metadata headers only. |
 | `DELETE /:bucket/:key` | 204, or 404 if absent. |
 | `GET /:bucket` | List objects. `?prefix=`, `?after=<key>`, `?limit=` (1–1000, default 100). Keyset pagination: follow `nextAfter` until it's null. |
@@ -276,6 +278,14 @@ thought it existed and it didn't, that's information.
 **`createdAt` is the current version's write time.** Overwriting an object
 moves it, together with the ETag. It answers "when was this content written",
 not "when did this key first appear".
+
+**Cacheability follows the credential, not the bucket.** An object read
+anonymously is `public, max-age=60`; the same object read with a key or a
+presigned signature is `private, no-store`. A public bucket read with a key is
+still private, because the response was authenticated — the same reasoning that
+makes a presented key always judged as that key. `Vary: Authorization` goes out
+with both, since one URL serves both callers. The window is short because keys
+are mutable, and conditional requests keep revalidation to a few hundred bytes.
 
 **Content types are stored verbatim.** Whatever `Content-Type` came with the
 PUT is what GET serves — default `application/octet-stream`, no sniffing.
