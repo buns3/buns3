@@ -4,12 +4,14 @@ COPY package.json ./
 COPY bun.lock ./
 COPY patches/ ./patches
 COPY tsconfig.json ./
+RUN mkdir -p /data && chown bun:bun /data
 
 FROM base AS migrate
 RUN bun install --frozen-lockfile
 COPY prisma.config.ts ./
 COPY src/modules/prisma/ ./src/modules/prisma
 ENV DO_NOT_TRACK=1
+USER bun
 CMD ["bunx", "prisma", "db", "migrate", "--advance-ref", "db"]
 
 FROM base AS runtime
@@ -22,5 +24,7 @@ ENV PORT=8000 \
   DATA_PATH=/data
 
 EXPOSE 8000
+
+USER bun
 
 CMD ["bun", "./src"]
