@@ -232,6 +232,7 @@ characters up to 1024, defined after percent-decoding — clients must encode.
 | | |
 |---|---|
 | `GET /_server` | What this server is: `{"version"}`. Any valid key, admin or not. |
+| `GET /_health` | Readiness, unauthenticated: `{"status", "checks": {"db", "storage"}}`. 200 when the database answers and the data directory is writable, 503 otherwise. What the container healthcheck polls. |
 
 Errors are RFC 9457 problem+json with a machine-readable `code` field.
 401 means missing, malformed, or unknown credentials; 403 means authenticated
@@ -400,7 +401,7 @@ this one) are claims about it.
 ## Development
 
 ```bash
-bun test              # 577 tests, ~3s, server and SDK
+bun test              # 581 tests, ~3s, server and SDK
 bun x tsc --noEmit    # Bun does not type-check; this does
 bun run dev           # watch mode on :8000
 ```

@@ -24,12 +24,25 @@ beforeEach(async () => {
 
 describe("request log", () => {
   test("one line per request, with method, path, status, duration and id", async () => {
-    await get("http://buns3.test/");
+    await get("http://buns3.test/_server");
     const [line] = requests();
     expect(requests()).toHaveLength(1);
-    expect(line).toMatchObject({ method: "GET", path: "/", status: 200 });
+    expect(line).toMatchObject({ method: "GET", path: "/_server", status: 401 });
     expect(typeof line!.requestId).toBe("string");
     expect(typeof line!.ms).toBe("number");
+  });
+
+  test("a healthy /_health logs at debug, not info — it is polled every 10s", async () => {
+    await get("http://buns3.test/_health");
+    expect(requests()).toHaveLength(0);
+    const debugLogger = pino({ level: "debug" }, { write: (s: string) => void lines.push(JSON.parse(s)) });
+    await createServer({ logger: debugLogger }).handle(new Request("http://buns3.test/_health"));
+    expect(requests().map((l) => l.level)).toEqual([20]);
+  });
+
+  test("GET / is a page for humans and stays at info", async () => {
+    await get("http://buns3.test/");
+    expect(requests().map((l) => l.status)).toEqual([200]);
   });
 
   test("a presigned request is logged without its query string", async () => {

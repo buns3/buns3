@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
     init: true
     healthcheck:
-      test: bun -e "const r = await fetch('http://localhost:'+(process.env.PORT??8000)); if(!r.ok) process.exit(1)" || exit 1
+      test: bun -e "const r = await fetch('http://localhost:'+(process.env.PORT??8000)+'/_health'); if(!r.ok) process.exit(1)" || exit 1
       interval: 10s
       timeout: 3s
       retries: 5

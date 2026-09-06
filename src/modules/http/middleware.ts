@@ -118,12 +118,17 @@ export const useLogger = (logger: Logger) =>
         t0?: number;
       };
 
-      logger.info(
+      const path = new URL(request.url).pathname;
+      const status = set.status ?? 200;
+      // The healthcheck polls every 10s; a healthy answer is not worth an info line, a 503 is.
+      const level = path === "/_health" && status === 200 ? "debug" : "info";
+
+      logger[level](
         {
           requestId,
           method: request.method,
-          path: new URL(request.url).pathname,
-          status: set.status ?? 200,
+          path,
+          status,
           ms: t0 === undefined ? undefined : Math.round(performance.now() - t0),
           auth: authState?.kind,
         },
