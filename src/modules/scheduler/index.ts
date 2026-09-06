@@ -6,10 +6,15 @@ import {
 } from "../storage/cleanup";
 import { CLEANUP_INTERVAL_MS } from "../storage/constants";
 
-function report(label: string, dryRun: boolean, result: SweepResult) {
+function report(
+  label: string,
+  dryRun: boolean,
+  result: SweepResult,
+  forceLog = false,
+) {
   if (result.success) {
     const { removed, errors } = result.data;
-    if (removed || errors) {
+    if (removed || errors || forceLog) {
       console.log(
         "cleanup",
         label,
@@ -30,7 +35,7 @@ export function initScheduler(opts: SchedulerOptions) {
   const { dryRun, olderThanMs, runOnStartup = false } = opts;
   let running = false;
 
-  async function sweep() {
+  async function sweep(forceLog = false) {
     if (running) return;
     running = true;
 
@@ -40,18 +45,18 @@ export function initScheduler(opts: SchedulerOptions) {
     ]);
 
     if (tempResult.status === "fulfilled")
-      report("temp", dryRun, tempResult.value);
+      report("temp", dryRun, tempResult.value, forceLog);
     else console.error("cleanup: sweep threw", tempResult.reason);
 
     if (blobResult.status === "fulfilled")
-      report("orphan", dryRun, blobResult.value);
+      report("orphan", dryRun, blobResult.value, forceLog);
     else console.error("cleanup: sweep threw", blobResult.reason);
 
     running = false;
   }
 
   if (runOnStartup) {
-    sweep();
+    sweep(true);
   }
 
   const timer = setInterval(sweep, CLEANUP_INTERVAL_MS);

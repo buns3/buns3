@@ -16,7 +16,7 @@ await fileStorage.init();
 const stopScheduler = initScheduler({
   olderThanMs: CLEANUP_OLDER_THAN_MS,
   dryRun: config.CLEANUP_DRY_RUN,
-  runOnStartup: false,
+  runOnStartup: config.CLEANUP_RUN_ON_STARTUP,
 });
 
 const server = initServer();
