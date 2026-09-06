@@ -42,6 +42,9 @@ mkdirSync(path.join(dataDir, ".tmp"), { recursive: true });
 
 process.env.SQLITE_PATH = path.join(runDir, "db.sqlite");
 process.env.DATA_PATH = dataDir;
+// config.ts validates at import and exits on a missing BASE_URL; the fixture
+// must not depend on a gitignored .env for it.
+process.env.BASE_URL = "http://buns3.test";
 
 // Template DB: migrate once per migration tip, file-copy per run.
 //

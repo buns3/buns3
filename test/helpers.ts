@@ -7,6 +7,7 @@ import { db } from "$/modules/prisma/db";
 import { bucketStorage } from "$/modules/storage/bucket";
 import { fileStorage } from "$/modules/storage/file-storage";
 import { apiKeyStorage } from "$/modules/api-keys/api-key-storage";
+import { config } from "$/config";
 
 // Wipe all rows (FK order) and all bucket dirs, keeping .tmp. Tests that
 // touch the DB or disk call this in beforeEach — isolation is explicit,
@@ -19,7 +20,7 @@ export async function resetStorage() {
   await db.orm.ApiKey.where((k) => k.id.isNotNull()).deleteAll();
   await db.orm.Bucket.where((b) => b.name.isNotNull()).deleteAll();
 
-  const dataPath = process.env.DATA_PATH!;
+  const dataPath = config.DATA_PATH;
   for (const entry of readdirSync(dataPath)) {
     if (entry === ".tmp") continue;
     rmSync(path.join(dataPath, entry), { recursive: true, force: true });
@@ -28,12 +29,16 @@ export async function resetStorage() {
 
 // Seeds go through the real storage APIs, never raw SQL — a seed that breaks
 // is itself a finding.
-export async function seedBucket(name: string, opts?: { publicRead?: boolean }) {
+export async function seedBucket(
+  name: string,
+  opts?: { publicRead?: boolean },
+) {
   const created = await bucketStorage.create(name);
   if (!created.success) throw new Error(`seedBucket(${name}): ${created.code}`);
   if (opts?.publicRead) {
     const updated = await bucketStorage.update(name, { publicRead: true });
-    if (!updated.success) throw new Error(`seedBucket(${name}): ${updated.code}`);
+    if (!updated.success)
+      throw new Error(`seedBucket(${name}): ${updated.code}`);
   }
   return created.bucket;
 }
@@ -52,21 +57,27 @@ export async function seedKey(input: {
     canWrite: input.canWrite ?? false,
     isAdmin: input.isAdmin ?? false,
   } as Parameters<typeof apiKeyStorage.create>[0]);
-  if (!result.success) throw new Error(`seedKey(${input.name}): ${result.code}`);
+  if (!result.success)
+    throw new Error(`seedKey(${input.name}): ${result.code}`);
   return result.data; // { apiKey, token } — token only exists here
 }
 
-export async function seedObject(bucket: string, key: string, content = "test content") {
+export async function seedObject(
+  bucket: string,
+  key: string,
+  content = "test content",
+) {
   const result = await fileStorage.put(
     bucket,
     key,
     new Blob([content]).stream(),
     "text/plain",
   );
-  if (!result.success) throw new Error(`seedObject(${bucket}/${key}): ${result.code}`);
+  if (!result.success)
+    throw new Error(`seedObject(${bucket}/${key}): ${result.code}`);
   return result.object;
 }
 
-export const dataPath = () => process.env.DATA_PATH!;
+export const dataPath = () => config.DATA_PATH;
 export const blobPath = (bucket: string, id: string) =>
   path.join(dataPath(), bucket, id);

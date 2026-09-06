@@ -5,6 +5,7 @@ import { apiKeyStorage } from "$/modules/api-keys/api-key-storage";
 import { PresignRequest } from "$/modules/validation/presign";
 import { authorize, methodCapabilityMap } from "$/modules/auth/authorize";
 import { buildPresignedUrl } from "$/lib/presign";
+import { config } from "$/config";
 
 export const selfRoutes = new Elysia({ name: "routes:self", prefix: "/_self" })
   .use(useAuth)
@@ -52,16 +53,11 @@ export const selfRoutes = new Elysia({ name: "routes:self", prefix: "/_self" })
     );
 
     return {
-      url: buildPresignedUrl(
-        process.env.BASE_URL ?? "http://localhost:8000",
-        input.bucket,
-        input.key,
-        {
-          expires: data.expires,
-          keyId: data.keyId,
-          sig: data.sig,
-        },
-      ),
+      url: buildPresignedUrl(config.BASE_URL, input.bucket, input.key, {
+        expires: data.expires,
+        keyId: data.keyId,
+        sig: data.sig,
+      }),
       expires: data.expires,
     };
   });

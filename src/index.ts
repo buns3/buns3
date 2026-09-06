@@ -1,3 +1,4 @@
+import { config } from "./config";
 import { initServer } from "./modules/http/server";
 import { initScheduler } from "./modules/scheduler";
 import { CLEANUP_OLDER_THAN_MS } from "./modules/storage/constants";
@@ -14,7 +15,7 @@ await fileStorage.init();
 
 const stopScheduler = initScheduler({
   olderThanMs: CLEANUP_OLDER_THAN_MS,
-  dryRun: false,
+  dryRun: config.CLEANUP_DRY_RUN,
   runOnStartup: false,
 });
 

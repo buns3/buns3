@@ -8,6 +8,7 @@ import { selfRoutes } from "./routes/self.routes";
 import { serverRoutes } from "./routes/server.routes";
 import { VERSION } from "$/lib/version";
 import { cleanupRoutes } from "./routes/cleanup.routes";
+import { config } from "$/config";
 
 export function createServer() {
   return new Elysia({
@@ -16,7 +17,7 @@ export function createServer() {
     .use(useErrorHandler)
     .use(
       openapi({
-        enabled: process.env.OPENAPI === "1",
+        enabled: config.OPENAPI,
         path: "/_openapi",
         exclude: {
           paths: ["/:bucket/*", "/:bucket"],
@@ -54,7 +55,7 @@ export function createServer() {
 }
 
 export function initServer() {
-  const app = createServer().listen(process.env.PORT ?? 8000);
+  const app = createServer().listen(config.PORT);
   console.log("HTTP server started at", app.server?.url.href, `(v${VERSION})`);
   return app;
 }

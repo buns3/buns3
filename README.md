@@ -53,14 +53,30 @@ bun install
 Create a `.env`:
 
 ```
-PORT=8000
-SQLITE_PATH=./data/db.sqlite
 BASE_URL=http://localhost:8000
 OPENAPI=1
 ```
 
-`OPENAPI=1` serves an interactive API reference at `/_openapi`, covering the
-admin, self and server planes. Leave it out in production — see the ledger.
+Configuration is validated once at startup, and the server refuses to start
+if any value is invalid, listing every problem at once. An empty value counts
+as unset. `BASE_URL` is the only required variable, and it must be an exact
+origin, no path or trailing slash, because presigned URLs are built from it.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `BASE_URL` | required | Origin used in presigned URLs. |
+| `PORT` | `8000` | 1–65535. |
+| `DATA_PATH` | `data` | Blob directory. |
+| `SQLITE_PATH` | `data/db.sqlite` | Metadata database. |
+| `OPENAPI` | `0` | `1` serves an interactive reference at `/_openapi`. Leave it off in production — see the ledger. |
+| `CLEANUP_ENABLED` | `1` | `0` disables the scheduled sweeps; `POST /_admin/cleanup` still works. |
+| `CLEANUP_DRY_RUN` | `0` | `1` makes the scheduled sweeps report without removing. |
+| `CLEANUP_RUN_ON_STARTUP` | `1` | Run a sweep when the server starts, so a deploy shows its report immediately. |
+| `CLEANUP_OLDER_THAN_MS` | `3600000` | The age gate. Floor 60000: a small gate races live uploads. |
+| `CLEANUP_INTERVAL_MS` | `900000` | Sweep interval. Floor 60000. |
+
+Flags are exactly `0` or `1`; anything else is a startup error rather than a
+guess.
 
 Apply migrations, mint the first admin key, start the server:
 

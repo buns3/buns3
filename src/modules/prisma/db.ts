@@ -1,8 +1,9 @@
 import sqlite from "@prisma/orm-sqlite/runtime";
 import type { Contract } from "./contract";
 import contractJson from "./contract.json" with { type: "json" };
+import { config } from "$/config";
 
-const connection = process.env.SQLITE_PATH;
+const connection = config.SQLITE_PATH;
 if (!connection) {
   throw new Error("SQLITE_PATH not found in environment variables");
 }
