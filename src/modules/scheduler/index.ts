@@ -1,10 +1,13 @@
+import { logger } from "$/lib/logger";
 import {
   sweepOrphanBlobs,
   sweepTempFiles,
   type SweepOptions,
   type SweepResult,
 } from "../storage/cleanup";
-import { CLEANUP_INTERVAL_MS } from "../storage/constants";
+import { config } from "$/config";
+
+const log = logger.child({ module: "scheduler" });
 
 function report(
   label: string,
@@ -15,15 +18,23 @@ function report(
   if (result.success) {
     const { removed, errors } = result.data;
     if (removed || errors || forceLog) {
-      console.log(
-        "cleanup",
-        label,
-        dryRun ? "dry run:" : "completed:",
-        result.data,
+      log.info(
+        {
+          label,
+          dryRun,
+          result: result.data,
+        },
+        "sweep completed",
       );
     }
   } else {
-    console.error("cleanup:", label, "failed", result.code);
+    log.error(
+      {
+        label,
+        errorCode: result.code,
+      },
+      "sweep failed",
+    );
   }
 }
 
@@ -46,11 +57,11 @@ export function initScheduler(opts: SchedulerOptions) {
 
     if (tempResult.status === "fulfilled")
       report("temp", dryRun, tempResult.value, forceLog);
-    else console.error("cleanup: sweep threw", tempResult.reason);
+    else log.error({ err: tempResult.reason, label: "temp" }, "sweep threw");
 
     if (blobResult.status === "fulfilled")
       report("orphan", dryRun, blobResult.value, forceLog);
-    else console.error("cleanup: sweep threw", blobResult.reason);
+    else log.error({ err: blobResult.reason, label: "orphan" }, "sweep threw");
 
     running = false;
   }
@@ -59,7 +70,7 @@ export function initScheduler(opts: SchedulerOptions) {
     sweep(true);
   }
 
-  const timer = setInterval(sweep, CLEANUP_INTERVAL_MS);
+  const timer = setInterval(sweep, config.CLEANUP_INTERVAL_MS);
   timer.unref();
 
   return () => {

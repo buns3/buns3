@@ -3,7 +3,7 @@ import { useAuth } from "../middleware";
 import { Cleanup } from "$/modules/validation/cleanup";
 import { validate } from "$/lib/error";
 import { sweepOrphanBlobs, sweepTempFiles } from "$/modules/storage/cleanup";
-import { CLEANUP_OLDER_THAN_MS } from "$/modules/storage/constants";
+import { config } from "$/config";
 
 export const cleanupRoutes = new Elysia({
   name: "routes:cleanup",
@@ -16,11 +16,11 @@ export const cleanupRoutes = new Elysia({
       ...input,
       temp: await sweepTempFiles({
         dryRun: input.dryRun,
-        olderThanMs: CLEANUP_OLDER_THAN_MS,
+        olderThanMs: config.CLEANUP_OLDER_THAN_MS,
       }),
       orphans: await sweepOrphanBlobs({
         dryRun: input.dryRun,
-        olderThanMs: CLEANUP_OLDER_THAN_MS,
+        olderThanMs: config.CLEANUP_OLDER_THAN_MS,
       }),
     };
   });

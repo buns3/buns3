@@ -10,6 +10,9 @@ import type {
 } from "./types";
 import { isPresignMethod, type PresignMethod } from "$/lib/presign";
 import { apiKeyStorage } from "../api-keys/api-key-storage";
+import { logger } from "$/lib/logger";
+
+const log = logger.child({ module: "auth" });
 
 const PRESIGN_PARAM_KEYS = PresignParams.props.map((p) => p.key);
 
@@ -38,6 +41,7 @@ export function resolveCredentials(
   }
 
   if (!authorization.toLowerCase().startsWith("bearer ")) {
+    log.debug("authorization scheme is not bearer");
     return {
       success: false,
       code: "INVALID_API_KEY",
@@ -57,6 +61,7 @@ function resolvePresignCredentials(
   query?: Record<string, string | undefined>,
 ): ResolvedCredentialsResult {
   if (authorization) {
+    log.debug("both authorization header and presign params presented");
     return {
       success: false,
       code: "INVALID_API_KEY",
@@ -70,6 +75,7 @@ function resolvePresignCredentials(
   });
 
   if (presignParams instanceof type.errors) {
+    log.debug({ problems: presignParams.summary }, "malformed presign params");
     return {
       success: false,
       code: "INVALID_API_KEY",
@@ -116,6 +122,7 @@ async function authorizeAnonymous(
   bucket?: string,
 ): Promise<AuthorizeResult> {
   if (capability !== "read" || !bucket) {
+    log.debug({ capability, bucket }, "anonymous request needs read on a bucket");
     return {
       success: false,
       code: "INVALID_API_KEY",
@@ -124,6 +131,7 @@ async function authorizeAnonymous(
 
   const result = await bucketStorage.get(bucket);
   if (!result.success || !result.bucket.publicRead) {
+    log.debug({ bucket, exists: result.success }, "anonymous read of a non-public bucket");
     return {
       success: false,
       code: "INVALID_API_KEY",
@@ -147,6 +155,7 @@ async function authorizePresign(
   const { capability, bucket, key, method } = opts;
 
   if (!bucket || !key || !isPresignMethod(method)) {
+    log.debug({ bucket, method }, "presigned request outside the data plane");
     return { success: false, code: "INVALID_API_KEY" };
   }
 
@@ -171,6 +180,7 @@ function authorizeKey(
   bucket?: string,
 ): AuthorizeResult {
   if (!hasCapability(apiKey, capability)) {
+    log.debug({ keyId: apiKey.id, capability, bucket }, "key lacks capability");
     return {
       success: false,
       code: "API_KEY_NOT_CAPABLE",
@@ -178,6 +188,7 @@ function authorizeKey(
   }
 
   if (!inScope(apiKey, bucket)) {
+    log.debug({ keyId: apiKey.id, keyBucket: apiKey.bucketName, bucket }, "key out of scope");
     return {
       success: false,
       code: "API_KEY_SCOPE_MISMATCH",

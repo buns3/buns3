@@ -9,12 +9,20 @@ import { serverRoutes } from "./routes/server.routes";
 import { VERSION } from "$/lib/version";
 import { cleanupRoutes } from "./routes/cleanup.routes";
 import { config } from "$/config";
+import { logger } from "$/lib/logger";
+import { useLogger } from "./middleware";
+import type { Logger } from "pino";
 
-export function createServer() {
+const defaultLogger = logger.child({ module: "http" });
+
+export function createServer({
+  logger = defaultLogger,
+}: { logger?: Logger } = {}) {
   return new Elysia({
     serve: { maxRequestBodySize: 5 * 1024 ** 3 },
   })
     .use(useErrorHandler)
+    .use(useLogger(logger))
     .use(
       openapi({
         enabled: config.OPENAPI,
@@ -56,6 +64,10 @@ export function createServer() {
 
 export function initServer() {
   const app = createServer().listen(config.PORT);
-  console.log("HTTP server started at", app.server?.url.href, `(v${VERSION})`);
+  defaultLogger.info(
+    { url: app.server?.url.href, version: VERSION },
+    "HTTP server started",
+  );
+  defaultLogger.info({ config }, "effective configuration");
   return app;
 }

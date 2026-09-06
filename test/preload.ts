@@ -45,6 +45,10 @@ process.env.DATA_PATH = dataDir;
 // config.ts validates at import and exits on a missing BASE_URL; the fixture
 // must not depend on a gitignored .env for it.
 process.env.BASE_URL = "http://buns3.test";
+// Bun auto-loads .env into tests; a developer's OPENAPI=1 must not leak in.
+process.env.OPENAPI = "0";
+// Route every log line, from every module, into lib/logger's in-memory sink.
+process.env.LOG_CAPTURE = "1";
 
 // Template DB: migrate once per migration tip, file-copy per run.
 //

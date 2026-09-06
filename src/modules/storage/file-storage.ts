@@ -5,6 +5,9 @@ import { db } from "$/modules/prisma/db";
 import { BASE_PATH, TEMP_DIR_NAME } from "./constants";
 import { toObjectSummary } from "./mapping";
 import { prefixUpperBound } from "$/lib/key";
+import { logger } from "$/lib/logger";
+
+const log = logger.child({ module: "storage" });
 
 function resolvePath(bucket: string, key: string) {
   return path.resolve(BASE_PATH, bucket, key);
@@ -21,6 +24,7 @@ export const fileStorage: Buns3Storage = {
     const dataDir = path.resolve(BASE_PATH);
     const tempDir = path.resolve(dataDir, TEMP_DIR_NAME);
     await mkdir(tempDir, { recursive: true });
+    log.debug({ path: dataDir }, "data dir ready");
   },
 
   async get(bucket, key) {
@@ -98,7 +102,7 @@ export const fileStorage: Buns3Storage = {
 
       await sink.end();
     } catch (err) {
-      console.error(err);
+      log.error({ bucket, key, err }, "could not write blob");
       await tempFile.unlink();
       return {
         success: false,
@@ -149,13 +153,13 @@ export const fileStorage: Buns3Storage = {
           // Unlink old file -> replaced by new one
           await resolve(bucket, existingObject.id).unlink();
         } catch (err) {
-          console.error("orphaned blob", bucket, existingObject.id, err);
+          log.warn({ bucket, key, blobId: existingObject.id, err }, "orphaned blob");
         }
       }
 
       return { success: true, file, object: newObject };
     } catch (err) {
-      console.error(err);
+      log.error({ bucket, key, err }, "could not write blob");
       await Promise.allSettled([tempFile.unlink(), file.unlink()]);
 
       return {
@@ -182,7 +186,7 @@ export const fileStorage: Buns3Storage = {
       const file = resolve(bucket, deleted.id);
       await file.unlink();
     } catch (err) {
-      console.error("orphaned blob", bucket, deleted.id, err);
+      log.warn({ bucket, key, blobId: deleted.id, err }, "orphaned blob");
     }
 
     return { success: true, file: null, object: deleted };
@@ -219,8 +223,8 @@ export const fileStorage: Buns3Storage = {
       deletedRows.map(async (row) => {
         try {
           await resolve(bucket, row.id).unlink();
-        } catch (error) {
-          console.error(`orphaned blob ${bucket}/${row.id}:`, error);
+        } catch (err) {
+          log.warn({ bucket, key: row.key, blobId: row.id, err }, "orphaned blob");
         }
       }),
     );

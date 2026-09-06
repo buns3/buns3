@@ -1,4 +1,17 @@
 import { type } from "arktype";
+import type { LevelWithSilent } from "pino";
+
+export const LOG_LEVELS = [
+  "fatal",
+  "error",
+  "warn",
+  "info",
+  "debug",
+  "trace",
+  "silent",
+] as const satisfies readonly LevelWithSilent[];
+
+export const LogLevel = type.enumerated(...LOG_LEVELS).default("info");
 
 const Flag = type("'0' | '1'").pipe((v) => v === "1");
 
@@ -12,6 +25,8 @@ const Base = type({
   DATA_PATH: "string = 'data'",
   SQLITE_PATH: "string = 'data/db.sqlite'",
   OPENAPI: Flag.default("0"),
+  LOG_CAPTURE: Flag.default("0"),
+  LOG_LEVEL: LogLevel,
 });
 
 const Cleanup = type({

@@ -7,6 +7,9 @@ import { db } from "$/modules/prisma/db";
 import { BucketName } from "$/modules/validation/bucket";
 import { BASE_PATH, TEMP_DIR_NAME } from "./constants";
 import { isErrnoException } from "./errors";
+import { logger } from "$/lib/logger";
+
+const log = logger.child({ module: "storage" });
 
 export type SweepOptions = {
   olderThanMs: number;
@@ -21,8 +24,7 @@ export type SweepData = {
 };
 
 export type SweepResult =
-  | { success: true; data: SweepData }
-  | { success: false; code: Buns3ErrorCode };
+  { success: true; data: SweepData } | { success: false; code: Buns3ErrorCode };
 
 const OUTCOMES = [
   "removed",
@@ -63,8 +65,7 @@ function summarize(counts: Counts, failures = 0): SweepData {
 
 function isGone(err: unknown): boolean {
   return (
-    isErrnoException(err) &&
-    (err.code === "ENOENT" || err.code === "ENOTEMPTY")
+    isErrnoException(err) && (err.code === "ENOENT" || err.code === "ENOTEMPTY")
   );
 }
 
@@ -84,12 +85,14 @@ async function sweepFile(
   } catch (err) {
     if (isErrnoException(err) && err.code === "ENOENT") return "vanished";
 
-    console.error("cleanup: could not remove", filePath, err);
+    log.error({ path: filePath, err }, "could not remove file");
     return "error";
   }
 }
 
-function classifyRootEntry(entry: Dirent): "bucket" | "temp" | "file" | "unknown" {
+function classifyRootEntry(
+  entry: Dirent,
+): "bucket" | "temp" | "file" | "unknown" {
   if (!entry.isDirectory()) return "file";
   if (entry.name === TEMP_DIR_NAME) return "temp";
   return BucketName(entry.name) instanceof type.errors ? "unknown" : "bucket";
@@ -102,7 +105,9 @@ async function sweepBucketDir(
 ): Promise<{ counts: Counts; failures: number }> {
   const dir = path.resolve(BASE_PATH, name);
   const bucket = await db.orm.Bucket.select("name").first({ name });
-  const rows = await db.orm.Object.select("id").where({ bucketName: name }).all();
+  const rows = await db.orm.Object.select("id")
+    .where({ bucketName: name })
+    .all();
   const owned = new Set(rows.map((o) => o.id));
   const counts = emptyCounts();
   let dirIsOld = false;
@@ -113,14 +118,16 @@ async function sweepBucketDir(
       if (owned.has(entry.name)) {
         counts.owned++;
       } else if (Uuid(entry.name) instanceof type.errors) {
-        console.warn("cleanup: not a blob, leaving alone", path.join(dir, entry.name));
+        log.warn({ path: dir, entry: entry.name }, "not a blob, leaving alone");
         counts["not-a-uuid"]++;
       } else {
-        counts[await sweepFile(path.resolve(dir, entry.name), cutoff, dryRun)]++;
+        counts[
+          await sweepFile(path.resolve(dir, entry.name), cutoff, dryRun)
+        ]++;
       }
     }
   } catch (err) {
-    console.error("cleanup: could not read bucket dir", dir, err);
+    log.error({ path: dir, err }, "could not read bucket dir");
     return { counts, failures: 1 };
   }
 
@@ -131,12 +138,12 @@ async function sweepBucketDir(
 
   try {
     if (!dryRun) await fs.rmdir(dir);
-    console.warn(`cleanup: ${dryRun ? "would remove" : "removed"} rowless bucket dir`, dir);
+    log.warn({ path: dir, dryRun }, "rowless bucket dir swept");
     return { counts, failures: 0 };
   } catch (err) {
     if (isGone(err)) return { counts, failures: 0 };
 
-    console.error("cleanup: could not remove bucket dir", dir, err);
+    log.error({ path: dir, err }, "could not remove bucket dir");
     return { counts, failures: 1 };
   }
 }
@@ -147,16 +154,24 @@ export async function sweepTempFiles(opts: SweepOptions): Promise<SweepResult> {
 
   try {
     for await (const entry of await fs.opendir(TEMP_PATH)) {
-      counts[await sweepFile(path.resolve(TEMP_PATH, entry.name), cutoff, opts.dryRun)]++;
+      counts[
+        await sweepFile(
+          path.resolve(TEMP_PATH, entry.name),
+          cutoff,
+          opts.dryRun,
+        )
+      ]++;
     }
     return { success: true, data: summarize(counts) };
   } catch (err) {
-    console.error("cleanup: could not read temp dir", TEMP_PATH, err);
+    log.error({ path: TEMP_PATH, err }, "could not read temp dir");
     return { success: false, code: "FS_ERROR" };
   }
 }
 
-export async function sweepOrphanBlobs(opts: SweepOptions): Promise<SweepResult> {
+export async function sweepOrphanBlobs(
+  opts: SweepOptions,
+): Promise<SweepResult> {
   const cutoff = Date.now() - opts.olderThanMs;
   let counts = emptyCounts();
   let failures = 0;
@@ -168,7 +183,10 @@ export async function sweepOrphanBlobs(opts: SweepOptions): Promise<SweepResult>
         case "temp":
           continue;
         case "unknown":
-          console.warn("cleanup: not a bucket dir, leaving alone", path.join(BASE_PATH, entry.name));
+          log.warn(
+            { path: BASE_PATH, entry: entry.name },
+            "not a bucket dir, leaving alone",
+          );
           continue;
         case "bucket": {
           const swept = await sweepBucketDir(entry.name, cutoff, opts.dryRun);
@@ -179,7 +197,7 @@ export async function sweepOrphanBlobs(opts: SweepOptions): Promise<SweepResult>
     }
     return { success: true, data: summarize(counts, failures) };
   } catch (err) {
-    console.error("cleanup: could not read data dir", BASE_PATH, err);
+    log.error({ path: BASE_PATH, err }, "could not read data dir");
     return { success: false, code: "FS_ERROR" };
   }
 }

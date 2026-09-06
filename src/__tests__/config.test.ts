@@ -28,6 +28,8 @@ describe("defaults", () => {
       DATA_PATH: "data",
       SQLITE_PATH: "data/db.sqlite",
       OPENAPI: false,
+      LOG_LEVEL: "info",
+      LOG_CAPTURE: false,
       CLEANUP_ENABLED: true,
       CLEANUP_DRY_RUN: false,
       CLEANUP_RUN_ON_STARTUP: true,
@@ -99,6 +101,17 @@ describe("flags", () => {
     expect([on.OPENAPI, on.CLEANUP_ENABLED, on.CLEANUP_DRY_RUN, on.CLEANUP_RUN_ON_STARTUP]).toEqual([true, true, true, true]);
     const off = ok({ ...valid, OPENAPI: "0", CLEANUP_ENABLED: "0", CLEANUP_DRY_RUN: "0", CLEANUP_RUN_ON_STARTUP: "0" });
     expect([off.OPENAPI, off.CLEANUP_ENABLED, off.CLEANUP_DRY_RUN, off.CLEANUP_RUN_ON_STARTUP]).toEqual([false, false, false, false]);
+  });
+});
+
+describe("LOG_LEVEL", () => {
+  test("accepts pino's levels and silent", () => {
+    expect(ok({ ...valid, LOG_LEVEL: "debug" }).LOG_LEVEL).toBe("debug");
+    expect(ok({ ...valid, LOG_LEVEL: "silent" }).LOG_LEVEL).toBe("silent");
+  });
+
+  test.each(["verbose", "INFO", "3"])("rejects %s", (v) => {
+    expect(fails({ ...valid, LOG_LEVEL: v })).toContain("LOG_LEVEL");
   });
 });
 

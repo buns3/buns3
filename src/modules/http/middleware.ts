@@ -5,6 +5,7 @@ import { Key } from "../validation/object";
 import { BucketName } from "../validation/bucket";
 import { authorize, resolveCredentials } from "../auth/authorize";
 import type { AuthorizeCapability, AuthState } from "../auth/types";
+import type { Logger } from "pino";
 
 export const useBucketKey = new Elysia({ name: "middleware:bucket-key" }).macro(
   {
@@ -101,3 +102,32 @@ export const useAuth = new Elysia({
     },
   }),
 });
+
+export const useLogger = (logger: Logger) =>
+  new Elysia({ name: "middleware:logger" })
+    .transform((ctx) => {
+      Object.assign(ctx, {
+        requestId: crypto.randomUUID(),
+        t0: performance.now(),
+      });
+    })
+    .afterResponse((ctx) => {
+      const { request, set, authState, requestId, t0 } = ctx as typeof ctx & {
+        authState?: AuthState;
+        requestId?: string;
+        t0?: number;
+      };
+
+      logger.info(
+        {
+          requestId,
+          method: request.method,
+          path: new URL(request.url).pathname,
+          status: set.status ?? 200,
+          ms: t0 === undefined ? undefined : Math.round(performance.now() - t0),
+          auth: authState?.kind,
+        },
+        "request",
+      );
+    })
+    .as("global");

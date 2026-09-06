@@ -69,6 +69,7 @@ origin, no path or trailing slash, because presigned URLs are built from it.
 | `DATA_PATH` | `data` | Blob directory. |
 | `SQLITE_PATH` | `data/db.sqlite` | Metadata database. |
 | `OPENAPI` | `0` | `1` serves an interactive reference at `/_openapi`. Leave it off in production — see the ledger. |
+| `LOG_LEVEL` | `info` | pino levels: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`. |
 | `CLEANUP_ENABLED` | `1` | `0` disables the scheduled sweeps; `POST /_admin/cleanup` still works. |
 | `CLEANUP_DRY_RUN` | `0` | `1` makes the scheduled sweeps report without removing. |
 | `CLEANUP_RUN_ON_STARTUP` | `1` | Run a sweep when the server starts, so a deploy shows its report immediately. |
@@ -77,6 +78,11 @@ origin, no path or trailing slash, because presigned URLs are built from it.
 
 Flags are exactly `0` or `1`; anything else is a startup error rather than a
 guess.
+
+Logs are JSON lines on stdout, one per request (`requestId`, method, path,
+status, duration, auth kind) plus operational events, each tagged with its
+`module`. `bun run dev` pipes them through `pino-pretty`; production writes
+them raw for whatever reads `docker logs`.
 
 Apply migrations, mint the first admin key, start the server:
 
@@ -379,6 +385,13 @@ are left alone and logged; blob names that aren't UUIDs are never touched.
 `POST /_admin/cleanup` runs the same sweeps on demand, with `dryRun` to see
 the report first.
 
+**A log line never contains a credential.** The request log records the
+path and nothing after the `?`, on every route, because a presigned URL's
+query string *is* a credential and a listing's `?prefix=` is not worth the
+exception. Tokens and the `Authorization` header are never logged; a 500
+carries a `requestId` that matches its request line, so the stack trace and
+the request can be joined without either being in the response.
+
 **One bug, one lesson.** Every gotcha this project has hit — beta framework
 lies, ORM codec surprises, timezone skews — is written into `CLAUDE.md` with
 the probe that proved it. The wire is the source of truth; the docs (including
@@ -387,7 +400,7 @@ this one) are claims about it.
 ## Development
 
 ```bash
-bun test              # 535 tests, ~3s, server and SDK
+bun test              # 577 tests, ~3s, server and SDK
 bun x tsc --noEmit    # Bun does not type-check; this does
 bun run dev           # watch mode on :8000
 ```

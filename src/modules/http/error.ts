@@ -1,5 +1,6 @@
 import { Buns3Error, Buns3ValidationError } from "$/lib/error";
 import type { Buns3AnyErrorCode } from "$/lib/error-codes";
+import { logger } from "$/lib/logger";
 import Elysia, {
   InternalServerError,
   NotFound,
@@ -7,6 +8,8 @@ import Elysia, {
   problem,
   ValidationError,
 } from "elysia";
+
+const log = logger.child({ module: "http" });
 
 export const ERROR_STATUS = {
   // 4xx
@@ -32,9 +35,9 @@ function fail(code: Buns3AnyErrorCode, detail?: string) {
   return problem(ERROR_STATUS[code], detail ? { code, detail } : { code });
 }
 
-function fail500(error: unknown) {
+function fail500(err: unknown) {
   const ref = crypto.randomUUID().substring(0, 8);
-  console.error("Error Ref:", ref, error);
+  log.error({ ref, err }, "unknown error occurred");
   return fail("UNKNOWN", `An unexpected error occurred (ref: ${ref})`);
 }
 

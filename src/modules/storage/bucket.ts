@@ -6,6 +6,9 @@ import { mkdir } from "node:fs/promises";
 import { isFkViolation, isUniqueViolation } from "./errors";
 import { rmdir } from "node:fs/promises";
 import { toBucketWithCount } from "./mapping";
+import { logger } from "$/lib/logger";
+
+const log = logger.child({ module: "storage" });
 
 function resolve(bucket: string) {
   return path.resolve(BASE_PATH, bucket);
@@ -55,6 +58,7 @@ export const bucketStorage: Buns3BucketStorage = {
         return created;
       });
 
+      log.info({ bucket }, "bucket created");
       return {
         success: true,
         bucket: toBucketWithCount(newBucket),
@@ -67,7 +71,7 @@ export const bucketStorage: Buns3BucketStorage = {
         };
       }
 
-      console.error(err);
+      log.error({ err }, "bucket create failed");
       return {
         success: false,
         code: "UNKNOWN",
@@ -94,6 +98,7 @@ export const bucketStorage: Buns3BucketStorage = {
       };
     }
 
+    log.info({ bucket, ...opts }, "bucket updated");
     return {
       success: true,
       bucket: toBucketWithCount(updated),
@@ -141,7 +146,7 @@ export const bucketStorage: Buns3BucketStorage = {
         };
       }
 
-      console.error(err);
+      log.error({ err }, "bucket delete failed");
       return {
         success: false,
         code: "UNKNOWN",
@@ -151,9 +156,10 @@ export const bucketStorage: Buns3BucketStorage = {
     try {
       await rmdir(bucketPath);
     } catch (err) {
-      console.error("orphaned bucket", bucket, err);
+      log.warn({ bucket, err }, "orphaned bucket");
     }
 
+    log.info({ bucket }, "bucket deleted");
     return {
       success: true,
       bucket: toBucketWithCount(deleted),
