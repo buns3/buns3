@@ -195,6 +195,7 @@ characters up to 1024, defined after percent-decoding — clients must encode.
 | `GET /_admin/keys` | All keys — names, hints, capabilities, last-used. Never hashes. |
 | `POST /_admin/keys` | Mint a key. Either a global admin key or a bucket-scoped data key with at least one of read/write. The token appears in this response and nowhere else. |
 | `DELETE /_admin/keys/:id` | Revoke. The bearer gets 401 on its very next request. |
+| `POST /_admin/cleanup` | Run the garbage sweeps now. Body `{"dryRun": bool}` (default false). Returns `{dryRun, temp, orphans}` with per-sweep counts; one sweep failing never fails the other. The age gate is the server's, never the caller's. |
 
 ### Self
 
@@ -351,6 +352,17 @@ page pulls a documentation bundle from a public CDN at an unpinned version —
 third-party JavaScript executing on the same origin as your objects, which is
 fine on a laptop and not on a deployment.
 
+**Garbage is collected by age, never by absence alone.** Two sweeps run every
+fifteen minutes and on startup: stale files in `.tmp` (a crash mid-upload)
+and blobs with no pointer (a failed unlink, logged as an orphan at the time).
+Both remove only what is older than an hour, because a blob without a pointer
+is also exactly what every in-flight upload looks like for a moment, and so is
+a freshly created bucket's empty directory. A sweep that trusted absence alone
+would race live writes and eat data. Directories the sweep doesn't recognise
+are left alone and logged; blob names that aren't UUIDs are never touched.
+`POST /_admin/cleanup` runs the same sweeps on demand, with `dryRun` to see
+the report first.
+
 **One bug, one lesson.** Every gotcha this project has hit — beta framework
 lies, ORM codec surprises, timezone skews — is written into `CLAUDE.md` with
 the probe that proved it. The wire is the source of truth; the docs (including
@@ -359,7 +371,7 @@ this one) are claims about it.
 ## Development
 
 ```bash
-bun test              # 517 tests, ~2.5s, server and SDK
+bun test              # 535 tests, ~3s, server and SDK
 bun x tsc --noEmit    # Bun does not type-check; this does
 bun run dev           # watch mode on :8000
 ```

@@ -7,6 +7,7 @@ import { bucketsRoutes } from "./routes/buckets.routes";
 import { selfRoutes } from "./routes/self.routes";
 import { serverRoutes } from "./routes/server.routes";
 import { VERSION } from "$/lib/version";
+import { cleanupRoutes } from "./routes/cleanup.routes";
 
 export function createServer() {
   return new Elysia({
@@ -48,7 +49,8 @@ export function createServer() {
     .use(apiKeyRoutes)
     .use(bucketsRoutes)
     .use(selfRoutes)
-    .use(serverRoutes);
+    .use(serverRoutes)
+    .use(cleanupRoutes);
 }
 
 export function initServer() {
