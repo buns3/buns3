@@ -129,6 +129,20 @@ describe("request log", () => {
     expect(JSON.stringify(capturedLogs)).not.toContain(token);
   });
 
+  test("client ip is absent unless LOG_CLIENT_IP is on, then follows proxy header precedence", async () => {
+    const withoutIp = await get("http://buns3.test/_server");
+    expect(withoutIp.status).toBe(401);
+    expect(requests()[0]).not.toHaveProperty("ip");
+
+    lines.length = 0;
+    const ipApp = createServer({ logger, clientIp: true });
+    const hit = (headers: Record<string, string>) => ipApp.handle(new Request("http://buns3.test/_server", { headers }));
+    await hit({ "cf-connecting-ip": "203.0.113.7", "x-forwarded-for": "198.51.100.9, 10.0.0.1" });
+    await hit({ "x-forwarded-for": "198.51.100.9, 10.0.0.1" });
+    await hit({});
+    expect(requests().map((l) => l.ip)).toEqual(["203.0.113.7", "198.51.100.9", undefined]);
+  });
+
   test("error responses are logged with their status and an id", async () => {
     await get("http://buns3.test/priv/a.txt");
     await get("http://buns3.test/bad_name");

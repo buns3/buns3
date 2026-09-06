@@ -17,12 +17,13 @@ const defaultLogger = logger.child({ module: "http" });
 
 export function createServer({
   logger = defaultLogger,
-}: { logger?: Logger } = {}) {
+  clientIp = config.LOG_CLIENT_IP,
+}: { logger?: Logger; clientIp?: boolean } = {}) {
   return new Elysia({
     serve: { maxRequestBodySize: 5 * 1024 ** 3 },
   })
     .use(useErrorHandler)
-    .use(useLogger(logger))
+    .use(useLogger(logger, { clientIp }))
     .use(
       openapi({
         enabled: config.OPENAPI,

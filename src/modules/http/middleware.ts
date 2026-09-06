@@ -103,7 +103,19 @@ export const useAuth = new Elysia({
   }),
 });
 
-export const useLogger = (logger: Logger) =>
+// Behind a proxy the socket peer is the proxy. Cloudflare's header is set by
+// Cloudflare and cannot be forged by a client that came through it; Traefik
+// sets X-Forwarded-For. Both are only trustworthy when the origin is reachable
+// solely through the proxy, which is the operator's call — hence a flag.
+function clientIpOf(request: Request, server: { requestIP(req: Request): { address: string } | null } | null) {
+  return (
+    request.headers.get("cf-connecting-ip") ??
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    server?.requestIP(request)?.address
+  );
+}
+
+export const useLogger = (logger: Logger, opts: { clientIp: boolean }) =>
   new Elysia({ name: "middleware:logger" })
     .transform((ctx) => {
       Object.assign(ctx, {
@@ -112,7 +124,7 @@ export const useLogger = (logger: Logger) =>
       });
     })
     .afterResponse((ctx) => {
-      const { request, set, authState, requestId, t0 } = ctx as typeof ctx & {
+      const { request, set, server, authState, requestId, t0 } = ctx as typeof ctx & {
         authState?: AuthState;
         requestId?: string;
         t0?: number;
@@ -131,6 +143,7 @@ export const useLogger = (logger: Logger) =>
           status,
           ms: t0 === undefined ? undefined : Math.round(performance.now() - t0),
           auth: authState?.kind,
+          ip: opts.clientIp ? clientIpOf(request, server) : undefined,
         },
         "request",
       );

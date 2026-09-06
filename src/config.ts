@@ -26,6 +26,7 @@ const Base = type({
   SQLITE_PATH: "string = 'data/db.sqlite'",
   OPENAPI: Flag.default("0"),
   LOG_CAPTURE: Flag.default("0"),
+  LOG_CLIENT_IP: Flag.default("0"),
   LOG_LEVEL: LogLevel,
 });
 

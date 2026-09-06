@@ -30,6 +30,7 @@ describe("defaults", () => {
       OPENAPI: false,
       LOG_LEVEL: "info",
       LOG_CAPTURE: false,
+      LOG_CLIENT_IP: false,
       CLEANUP_ENABLED: true,
       CLEANUP_DRY_RUN: false,
       CLEANUP_RUN_ON_STARTUP: true,

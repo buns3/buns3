@@ -70,6 +70,7 @@ origin, no path or trailing slash, because presigned URLs are built from it.
 | `SQLITE_PATH` | `data/db.sqlite` | Metadata database. |
 | `OPENAPI` | `0` | `1` serves an interactive reference at `/_openapi`. Leave it off in production — see the ledger. |
 | `LOG_LEVEL` | `info` | pino levels: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`. |
+| `LOG_CLIENT_IP` | `0` | `1` adds the client address to each request line, from `CF-Connecting-IP`, then the first `X-Forwarded-For` hop, then the socket peer. Trust those headers only if the origin is reachable solely through your proxy. An IP address is personal data; enabling this makes your log retention a privacy question. |
 | `CLEANUP_ENABLED` | `1` | `0` disables the scheduled sweeps; `POST /_admin/cleanup` still works. |
 | `CLEANUP_DRY_RUN` | `0` | `1` makes the scheduled sweeps report without removing. |
 | `CLEANUP_RUN_ON_STARTUP` | `1` | Run a sweep when the server starts, so a deploy shows its report immediately. |
@@ -401,7 +402,7 @@ this one) are claims about it.
 ## Development
 
 ```bash
-bun test              # 581 tests, ~3s, server and SDK
+bun test              # 582 tests, ~3s, server and SDK
 bun x tsc --noEmit    # Bun does not type-check; this does
 bun run dev           # watch mode on :8000
 ```
