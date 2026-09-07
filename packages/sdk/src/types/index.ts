@@ -9,3 +9,4 @@ export type * from "./bucket";
 export type * from "./object";
 export type * from "./presign";
 export type * from "./server";
+export type * from "./upload";

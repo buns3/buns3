@@ -10,10 +10,13 @@ import {
 import { createHttp } from "../../../../packages/sdk/src/http";
 import { createObjects } from "../../../../packages/sdk/src/planes/objects";
 import { createSelf } from "../../../../packages/sdk/src/planes/self";
+import { createUpload } from "../../../../packages/sdk/src/planes/upload";
 import { createAdmin } from "../../../../packages/sdk/src/planes/admin";
 import { createPresigned } from "../../../../packages/sdk/src/planes/presigned";
 import {
   buildPresignedUrl,
+  buildUploadPresignedUrl,
+  signUpload,
   deriveKeyId,
   hashToken,
   sign,
@@ -599,5 +602,136 @@ describe("the server plane", () => {
       status: 401,
       code: "INVALID_API_KEY",
     });
+  });
+});
+
+describe("chunked uploads through the SDK", () => {
+  test("a multi-chunk file arrives whole, and reads back through the data plane", async () => {
+    await seedBucket("dev");
+    const { token } = await seedKey({
+      name: "rw",
+      bucketName: "dev",
+      canRead: true,
+      canWrite: true,
+    });
+    const objects = createObjects(sdk(token));
+
+    const body = new Blob(["chunk one|chunk two|chunk three"]);
+    const res = await objects.putChunked("dev", "big/file.txt", body, {
+      contentType: "text/plain",
+      chunkSize: 10,
+    });
+
+    expect(res.success).toBe(true);
+    if (!res.success) return;
+    expect(res.data).toMatchObject({ bucket: "dev", key: "big/file.txt" });
+    expect(res.data.location).toBe("/dev/big/file.txt");
+
+    const got = await objects.get("dev", "big/file.txt");
+    expect(got.success && (await got.data.text())).toBe("chunk one|chunk two|chunk three");
+  });
+
+  test("completing answers the same shape a plain put does", async () => {
+    // The whole point: a caller can treat the two paths as one operation.
+    await seedBucket("dev");
+    const { token } = await seedKey({ name: "rw", bucketName: "dev", canRead: true, canWrite: true });
+    const objects = createObjects(sdk(token));
+
+    const chunked = await objects.putChunked("dev", "a.txt", new Blob(["hello"]), { chunkSize: 2 });
+    const plain = await objects.put("dev", "b.txt", "hello", { contentType: "text/plain" });
+
+    expect(chunked.success && Object.keys(chunked.data).sort()).toEqual(
+      plain.success ? Object.keys(plain.data).sort() : [],
+    );
+  });
+
+  test("a resumed session continues from the server's recorded size", async () => {
+    // The offset the server reports is the truth; a client that lost track
+    // asks for it rather than assuming.
+    await seedBucket("dev");
+    const { token } = await seedKey({ name: "rw", bucketName: "dev", canRead: true, canWrite: true });
+    const uploads = createUpload(sdk(token));
+
+    const created = await uploads.create({ bucket: "dev", key: "resumed.txt" });
+    expect(created.success).toBe(true);
+    if (!created.success) return;
+    const { uploadId } = created.data.upload;
+
+    await uploads.append(uploadId, new Blob(["first "]), 0);
+
+    const asked = await uploads.get(uploadId);
+    expect(asked.success && asked.data.upload.size).toBe(6);
+
+    await uploads.append(uploadId, new Blob(["second"]), 6);
+    expect((await uploads.complete(uploadId)).success).toBe(true);
+
+    const got = await createObjects(sdk(token)).get("dev", "resumed.txt");
+    expect(got.success && (await got.data.text())).toBe("first second");
+  });
+
+  test("a stale offset is refused, and the SDK reports the server's code", async () => {
+    await seedBucket("dev");
+    const { token } = await seedKey({ name: "rw", bucketName: "dev", canRead: true, canWrite: true });
+    const uploads = createUpload(sdk(token));
+
+    const created = await uploads.create({ bucket: "dev", key: "conflict.txt" });
+    if (!created.success) return;
+    const { uploadId } = created.data.upload;
+    await uploads.append(uploadId, new Blob(["abc"]), 0);
+
+    const stale = await uploads.append(uploadId, new Blob(["xyz"]), 0);
+    expect(stale).toMatchObject({ success: false, status: 409, code: "OFFSET_MISMATCH" });
+  });
+
+  test("an SDK-signed session URL is accepted by the server", async () => {
+    // The offline signer again, this time over a session: one URL carries
+    // every chunk, and nothing on the request identifies the key.
+    await seedBucket("dev");
+    const { token } = await seedKey({ name: "rw", bucketName: "dev", canRead: true, canWrite: true });
+    const uploads = createUpload(sdk(token));
+
+    const created = await uploads.create({ bucket: "dev", key: "signed.txt" });
+    if (!created.success) return;
+    const { uploadId } = created.data.upload;
+
+    const tokenHash = await hashToken(token);
+    const expires = Math.floor(Date.now() / 1000) + 600;
+    const url = buildUploadPresignedUrl(BASE, uploadId, {
+      keyId: await deriveKeyId(tokenHash),
+      expires,
+      sig: await signUpload({ tokenHash, uploadId, expires }),
+    });
+
+    // The plane builds its own paths, so a caller holding a signed URL uses it
+    // directly — which is exactly what a browser does.
+    const direct = await app.handle(new Request(url, { method: "PATCH", body: "signed bytes" }));
+    expect(direct.status).toBe(200);
+
+    const done = await app.handle(new Request(`${url.replace("?", "/complete?")}`, { method: "POST" }));
+    expect(done.status).toBe(201);
+
+    const got = await createObjects(sdk(token)).get("dev", "signed.txt");
+    expect(got.success && (await got.data.text())).toBe("signed bytes");
+  });
+
+  test("the server minted URL and the SDK signed one are the same signature", async () => {
+    await seedBucket("dev");
+    const { token } = await seedKey({ name: "rw", bucketName: "dev", canRead: true, canWrite: true });
+    const uploads = createUpload(sdk(token));
+
+    const created = await uploads.create({ bucket: "dev", key: "same.txt" });
+    if (!created.success) return;
+    const { uploadId } = created.data.upload;
+
+    const minted = await uploads.presign(uploadId, 600);
+    expect(minted.success).toBe(true);
+    if (!minted.success) return;
+
+    const serverSig = new URL(minted.data.url).searchParams.get("sig") ?? "";
+    const tokenHash = await hashToken(token);
+    const ours = await signUpload({ tokenHash, uploadId, expires: minted.data.expires });
+
+    // Compared on the SIGNATURE, not the URL: the host is deliberately unsigned.
+    expect(ours).toBe(serverSig);
   });
 });

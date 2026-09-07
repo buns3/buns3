@@ -23,6 +23,7 @@ export {
 export { createSelf } from "./planes/self";
 export { createPresigned } from "./planes/presigned";
 export { createServer } from "./planes/server";
+export { createUpload } from "./planes/upload";
 export type { Result, Problem } from "./result";
 export type * from "./types";
 export { uriEncodedKey } from "./lib/encoding";

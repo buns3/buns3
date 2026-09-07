@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Http, RequestOptions } from "../../http";
 import { bindBucket, createObjects, parseObjectMeta } from "../objects";
-import { ok } from "../../result";
+import { fail, ok } from "../../result";
 import type { Result } from "../../result";
 
 // --- fakes -----------------------------------------------------------------
@@ -427,5 +427,171 @@ describe("bindBucket", () => {
     expect(last(calls).path).toBe("/two");
     await a.list();
     expect(last(calls).path).toBe("/one");
+  });
+});
+
+describe("putChunked", () => {
+  // Sessions the fake server keeps, so the loop's offsets are checked against
+  // something that behaves like the real one: the recorded size is the truth.
+  function fakeUploads(opts: { failOn?: number } = {}) {
+    const sessions = new Map<string, { size: number }>();
+    let appends = 0;
+
+    const { http, calls, objects } = fakeHttp(({ path, init }) => {
+      if (path === "/_uploads") {
+        const id = `up-${sessions.size + 1}`;
+        sessions.set(id, { size: 0 });
+        return { upload: { uploadId: id, bucket: "b", key: "k", contentType: "text/plain", size: 0 } };
+      }
+      if (path.endsWith("/complete")) {
+        return new Response(JSON.stringify({ bucket: "b", key: "k", location: "/b/k" }), {
+          status: 201,
+          headers: { location: "/b/k", "content-type": "application/json" },
+        });
+      }
+      // PATCH: grow the session by the chunk's length
+      appends += 1;
+      const id = path.slice("/_uploads/".length, path.indexOf("?"));
+      const session = sessions.get(id)!;
+      const body = init?.body as Blob;
+      session.size += body.size;
+      return { upload: { uploadId: id, bucket: "b", key: "k", contentType: "text/plain", size: session.size } };
+    });
+
+    return { http, calls, objects, sessions, appends: () => appends };
+  }
+
+  const patches = (calls: Call[]) =>
+    calls.filter((c) => c.init?.method === "PATCH");
+
+  test("sends the body in chunks and completes", async () => {
+    const { objects, calls } = fakeUploads();
+    const body = new Blob(["x".repeat(25)]);
+
+    const res = await objects.putChunked("b", "k", body, { chunkSize: 10 });
+    expect(res.success).toBe(true);
+    if (!res.success) return;
+    expect(res.data).toMatchObject({ bucket: "b", key: "k", location: "/b/k" });
+
+    // 25 bytes in 10-byte chunks: 10, 10, 5
+    expect(patches(calls)).toHaveLength(3);
+    expect(patches(calls).map((c) => (c.init?.body as Blob).size)).toEqual([10, 10, 5]);
+  });
+
+  test("each chunk states the offset the server last recorded", async () => {
+    // Not a local counter: a partially applied chunk must not desync the client.
+    const { objects, calls } = fakeUploads();
+    await objects.putChunked("b", "k", new Blob(["x".repeat(25)]), { chunkSize: 10 });
+
+    expect(patches(calls).map((c) => new URL(`http://x${c.path}`).searchParams.get("offset")))
+      .toEqual(["0", "10", "20"]);
+  });
+
+  test("an empty body creates a session and completes it, without appending", async () => {
+    // Zero-byte objects are legal, so an upload with nothing in it is not an error.
+    const { objects, calls } = fakeUploads();
+    const res = await objects.putChunked("b", "k", new Blob([]));
+    expect(res.success).toBe(true);
+    expect(patches(calls)).toHaveLength(0);
+    expect(calls.some((c) => c.path.endsWith("/complete"))).toBe(true);
+  });
+
+  test("progress reports the server's size, and finishes at the total", async () => {
+    const { objects } = fakeUploads();
+    const seen: [number, number][] = [];
+    await objects.putChunked("b", "k", new Blob(["x".repeat(25)]), {
+      chunkSize: 10,
+      onProgress: (uploaded, total) => seen.push([uploaded, total]),
+    });
+    expect(seen).toEqual([[10, 25], [20, 25], [25, 25]]);
+  });
+
+  test("the content type is stated once, at session creation", async () => {
+    // Not per chunk: the server fixes it when the session opens, and
+    // blob.stream() would have lost it anyway.
+    const { objects, calls } = fakeUploads();
+    await objects.putChunked("b", "k", new Blob(["x"]), { contentType: "text/csv" });
+
+    const create = calls.find((c) => c.path === "/_uploads")!;
+    expect(JSON.parse(create.init?.body as string)).toEqual({
+      bucket: "b",
+      key: "k",
+      contentType: "text/csv",
+    });
+    expect(patches(calls).every((c) => !new Headers(c.init?.headers).get("content-type"))).toBe(true);
+  });
+
+  test("a failed chunk returns the server's own error, not a synthetic one", async () => {
+    // The caller needs the real status and code to know whether to retry, and
+    // status 0 means "no response at all" in this SDK.
+    const calls: Call[] = [];
+    const denied = fail(403, "API_KEY_NOT_CAPABLE") as Result<never>;
+    const http: Http = {
+      request: async (path, init) => {
+        calls.push({ path, init });
+        return denied;
+      },
+      requestJson: async <T,>(path: string, init?: RequestOptions) => {
+        calls.push({ path, init });
+        if (path === "/_uploads") {
+          return ok({
+            upload: { uploadId: "up-1", bucket: "b", key: "k", contentType: "x", size: 0 },
+          }) as Result<T>;
+        }
+        return denied;
+      },
+    };
+
+    const res = await createObjects(http).putChunked("b", "k", new Blob(["hello"]), {
+      chunkSize: 2,
+    });
+    expect(res).toEqual({ success: false, status: 403, code: "API_KEY_NOT_CAPABLE" });
+    // it stopped at the first refusal rather than sending the rest
+    expect(calls.filter((c) => c.init?.method === "PATCH")).toHaveLength(1);
+  });
+
+  test("a failed chunk never completes the upload", async () => {
+    // Completing after a refused chunk would publish a TRUNCATED object and
+    // report success — the worst possible outcome, and silent.
+    const calls: Call[] = [];
+    const http: Http = {
+      request: async (path, init) => {
+        calls.push({ path, init });
+        return fail(403, "API_KEY_NOT_CAPABLE") as Result<Response>;
+      },
+      requestJson: async <T,>(path: string, init?: RequestOptions) => {
+        calls.push({ path, init });
+        if (path === "/_uploads") {
+          return ok({
+            upload: { uploadId: "up-1", bucket: "b", key: "k", contentType: "x", size: 0 },
+          }) as Result<T>;
+        }
+        return fail(403, "API_KEY_NOT_CAPABLE") as Result<T>;
+      },
+    };
+
+    const res = await createObjects(http).putChunked("b", "k", new Blob(["hello"]), {
+      chunkSize: 2,
+    });
+    expect(res.success).toBe(false);
+    expect(calls.some((c) => c.path.endsWith("/complete"))).toBe(false);
+  });
+
+  test("a failed create never appends", async () => {
+    const calls: Call[] = [];
+    const http: Http = {
+      request: async (path, init) => {
+        calls.push({ path, init });
+        return fail(403, "API_KEY_SCOPE_MISMATCH") as Result<Response>;
+      },
+      requestJson: async <T,>(path: string, init?: RequestOptions) => {
+        calls.push({ path, init });
+        return fail(403, "API_KEY_SCOPE_MISMATCH") as Result<T>;
+      },
+    };
+
+    const res = await createObjects(http).putChunked("b", "k", new Blob(["hello"]));
+    expect(res).toEqual({ success: false, status: 403, code: "API_KEY_SCOPE_MISMATCH" });
+    expect(calls).toHaveLength(1);
   });
 });

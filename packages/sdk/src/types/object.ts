@@ -68,6 +68,12 @@ export interface PutObjectOptions {
   contentType?: string;
 }
 
+export interface PutChunkedObjectOptions {
+  contentType?: string;
+  chunkSize?: number;
+  onProgress?: (offset: number, size: number) => void;
+}
+
 /** Keyset pagination. Only the filters you set are sent. */
 export interface ListObjectsOptions {
   prefix?: string;

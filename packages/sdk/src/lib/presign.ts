@@ -74,3 +74,32 @@ export function buildPresignedUrl(
 
   return `${base}/${bucket}/${encodedKey}?${searchParams}`;
 }
+
+const UPLOAD_IDENTIFIER = "buns3-presign-upload-v1";
+
+export type CanonicalUploadStringOptions = {
+  uploadId: string;
+  expires: number;
+};
+
+export type SignUploadOptions = CanonicalUploadStringOptions & {
+  tokenHash: string;
+};
+
+function canonicalUploadString(opts: CanonicalUploadStringOptions) {
+  // "buns3-presign-upload-v1\n" + uploadId + "\n" + expires
+  return `${UPLOAD_IDENTIFIER}\n${opts.uploadId}\n${opts.expires}`;
+}
+
+export async function signUpload(opts: SignUploadOptions) {
+  const { tokenHash, ...rest } = opts;
+  return await hmacHex(tokenHash, canonicalUploadString(rest));
+}
+
+export function buildUploadPresignedUrl(
+  base: string,
+  uploadId: string,
+  { keyId, expires, sig }: { keyId: string; expires: number; sig: string },
+) {
+  return `${base}/_uploads/${uploadId}?keyId=${keyId}&expires=${expires}&sig=${sig}`;
+}

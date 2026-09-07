@@ -11,6 +11,7 @@ import { bindBucket, createObjects } from "./planes/objects";
 import { createPresigned } from "./planes/presigned";
 import { createSelf } from "./planes/self";
 import { createServer } from "./planes/server";
+import { createUpload } from "./planes/upload";
 
 /**
  * What both clients share: the `/_self` plane, which any valid key can reach,
@@ -66,6 +67,8 @@ export class Buns3BaseClient {
 export class Buns3Client extends Buns3BaseClient {
   /** Read, write, list and delete objects. */
   readonly objects;
+  /** Chunked upload sessions. For a whole file, `objects.putChunked` is simpler. */
+  readonly uploads;
 
   readonly #token?: string;
 
@@ -73,6 +76,7 @@ export class Buns3Client extends Buns3BaseClient {
     super(baseUrl, opts);
     this.#token = opts.token;
     this.objects = createObjects(this.http);
+    this.uploads = createUpload(this.http);
   }
 
   /**

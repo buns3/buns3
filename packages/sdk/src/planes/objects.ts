@@ -9,7 +9,12 @@ import type {
   ReadObjectOptions,
   PutObjectOptions,
   ListObjectsOptions,
+  PutChunkedObjectOptions,
 } from "../types";
+import { createUpload } from "./upload";
+
+// proxies cap request bodies, safe default - 8 MB
+const DEFAULT_CHUNK_SIZE = 8 * 1024 ** 2;
 
 const paths = {
   get: "/:bucket/:key*",
@@ -82,6 +87,8 @@ export function putInit(body: BodyInit, contentType?: string) {
 }
 
 export function createObjects(http: Http) {
+  const uploads = createUpload(http);
+
   async function get(
     bucket: string,
     key: string,
@@ -123,6 +130,31 @@ export function createObjects(http: Http) {
     });
   }
 
+  async function putChunked(
+    bucket: string,
+    key: string,
+    body: Blob,
+    opts: PutChunkedObjectOptions = {},
+  ): Promise<Result<PutObjectResponse & { location: string | null }>> {
+    const { contentType, chunkSize = DEFAULT_CHUNK_SIZE, onProgress } = opts;
+    const created = await uploads.create({ bucket, key, contentType });
+    if (!created.success) return created;
+    const { uploadId } = created.data.upload;
+
+    let offset = 0;
+    while (offset < body.size) {
+      const chunk = body.slice(offset, offset + chunkSize);
+      const res = await uploads.append(uploadId, chunk, offset);
+      // the session survives and resumes with the same id, and the sweep collects it if nobody does.
+      if (!res.success) return res;
+
+      offset = res.data.upload.size;
+      onProgress?.(offset, body.size);
+    }
+
+    return uploads.complete(uploadId);
+  }
+
   async function list(
     bucket: string,
     filters: ListObjectsOptions = {},
@@ -143,7 +175,9 @@ export function createObjects(http: Http) {
     }
 
     const qs = searchParams.toString();
-    return await http.requestJson<ObjectListResponse>(qs ? `${path}?${qs}` : path);
+    return await http.requestJson<ObjectListResponse>(
+      qs ? `${path}?${qs}` : path,
+    );
   }
 
   async function deleteObject(
@@ -172,6 +206,7 @@ export function createObjects(http: Http) {
     get,
     head,
     put,
+    putChunked,
     list,
     delete: deleteObject,
     deleteMany,
@@ -189,7 +224,8 @@ export type BucketScope = ReturnType<typeof bindBucket>;
  */
 export function bindBucket(objects: ObjectsPlane, bucket: string) {
   return {
-    get: (key: string, opts?: ReadObjectOptions) => objects.get(bucket, key, opts),
+    get: (key: string, opts?: ReadObjectOptions) =>
+      objects.get(bucket, key, opts),
     head: (key: string, opts?: ReadObjectOptions) =>
       objects.head(bucket, key, opts),
     put: (key: string, body: BodyInit, opts?: PutObjectOptions) =>
