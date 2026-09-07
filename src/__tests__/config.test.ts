@@ -34,6 +34,7 @@ describe("defaults", () => {
       CLEANUP_ENABLED: true,
       CLEANUP_DRY_RUN: false,
       CLEANUP_RUN_ON_STARTUP: true,
+      CLEANUP_UPLOAD_OLDER_THAN_MS: 86_400_000,
       CLEANUP_OLDER_THAN_MS: 3_600_000,
       CLEANUP_INTERVAL_MS: 900_000,
     });

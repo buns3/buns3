@@ -34,6 +34,9 @@ const Cleanup = type({
   CLEANUP_ENABLED: Flag.default("1"),
   CLEANUP_DRY_RUN: Flag.default("0"),
   CLEANUP_RUN_ON_STARTUP: Flag.default("1"),
+  CLEANUP_UPLOAD_OLDER_THAN_MS: type("string.integer.parse")
+    .to("number >= 3600000")
+    .default("86400000"), // default 24 hours
   CLEANUP_OLDER_THAN_MS: type("string.integer.parse")
     .to("number >= 60000")
     .default("3600000"), // default 60 minutes

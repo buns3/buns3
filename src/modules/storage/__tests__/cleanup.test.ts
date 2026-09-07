@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import { mkdir, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { sweepOrphanBlobs, sweepTempFiles } from "../cleanup";
+import {
+  sweepAbandonedUploads,
+  sweepOrphanBlobs,
+  sweepTempFiles,
+} from "../cleanup";
+import { db } from "$/modules/prisma/db";
+import { uploadStorage } from "../upload-storage";
 import {
   blobPath,
   dataPath,
@@ -16,6 +22,8 @@ import {
 // pointer is also what every in-flight upload looks like for a moment.
 
 const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
+const uploadPath = (id: string) => path.join(dataPath(), ".uploads", id);
 const sweep = { olderThanMs: HOUR, dryRun: false };
 
 const tmpDir = () => path.join(dataPath(), ".tmp");
@@ -45,9 +53,12 @@ async function plantRowlessDir(name: string, ageMs: number, files: number[]) {
 
 beforeEach(async () => {
   await resetStorage();
-  // resetStorage deliberately keeps .tmp; these tests must not inherit its contents
-  for (const entry of readdirSync(tmpDir())) {
-    rmSync(path.join(tmpDir(), entry), { recursive: true, force: true });
+  // resetStorage deliberately keeps .tmp and .uploads; these tests must not
+  // inherit either directory's contents.
+  for (const dir of [tmpDir(), path.join(dataPath(), ".uploads")]) {
+    for (const entry of readdirSync(dir)) {
+      rmSync(path.join(dir, entry), { recursive: true, force: true });
+    }
   }
 });
 
@@ -210,5 +221,77 @@ describe("sweepOrphanBlobs", () => {
     expect(real.success && real.data.removed).toBe(2);
     expect(existsSync(orphan)).toBe(false);
     expect(existsSync(ghost)).toBe(false);
+  });
+});
+
+describe("sweepAbandonedUploads", () => {
+  const age = async (id: string, ms: number) => {
+    const then = new Date(Date.now() - ms);
+    await db.orm.Upload.where({ id }).update({ updatedAt: then });
+    await utimes(uploadPath(id), then, then);
+  };
+
+  test("collects a session nobody touched, row and file together", async () => {
+    await seedBucket("b");
+    const created = await uploadStorage.create("b", "k");
+    if (!created.success) throw new Error(created.code);
+    await age(created.data.id, 2 * DAY);
+
+    const result = await sweepAbandonedUploads({ olderThanMs: DAY, dryRun: false });
+    expect(result).toEqual({
+      success: true,
+      data: { scanned: 1, removed: 1, skipped: 0, errors: 0 },
+    });
+    expect(existsSync(uploadPath(created.data.id))).toBe(false);
+    expect(await uploadStorage.get(created.data.id)).toEqual({
+      success: false,
+      code: "UPLOAD_NOT_FOUND",
+    });
+  });
+
+  test("leaves a live upload alone, however large", async () => {
+    // The data-eater case: a slow upload is indistinguishable from an
+    // abandoned one except by age.
+    await seedBucket("b");
+    const created = await uploadStorage.create("b", "k");
+    if (!created.success) throw new Error(created.code);
+    await uploadStorage.append(created.data.id, new Blob(["still going"]).stream());
+
+    const result = await sweepAbandonedUploads({ olderThanMs: DAY, dryRun: false });
+    expect(result.success && result.data.removed).toBe(0);
+    expect(existsSync(uploadPath(created.data.id))).toBe(true);
+    expect((await uploadStorage.get(created.data.id)).success).toBe(true);
+  });
+
+  test("an old file whose row is gone is collected; a fresh one is not", async () => {
+    const orphan = path.join(dataPath(), ".uploads", crypto.randomUUID());
+    const fresh = path.join(dataPath(), ".uploads", crypto.randomUUID());
+    await plant(orphan, 2 * DAY);
+    await plant(fresh);
+
+    const result = await sweepAbandonedUploads({ olderThanMs: DAY, dryRun: false });
+    expect(existsSync(orphan)).toBe(false);
+    expect(existsSync(fresh)).toBe(true);
+    expect(result.success && result.data.skipped).toBe(1);
+  });
+
+  test("a file that is not a uuid is never touched", async () => {
+    const stray = path.join(dataPath(), ".uploads", "notes.txt");
+    await plant(stray, 2 * DAY);
+
+    await sweepAbandonedUploads({ olderThanMs: DAY, dryRun: false });
+    expect(existsSync(stray)).toBe(true);
+  });
+
+  test("dry run reports what it would collect and removes nothing", async () => {
+    await seedBucket("b");
+    const created = await uploadStorage.create("b", "k");
+    if (!created.success) throw new Error(created.code);
+    await age(created.data.id, 2 * DAY);
+
+    const dry = await sweepAbandonedUploads({ olderThanMs: DAY, dryRun: true });
+    expect(dry.success && dry.data.removed).toBe(1);
+    expect(existsSync(uploadPath(created.data.id))).toBe(true);
+    expect((await uploadStorage.get(created.data.id)).success).toBe(true);
   });
 });

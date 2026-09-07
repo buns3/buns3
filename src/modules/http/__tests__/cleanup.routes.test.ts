@@ -57,6 +57,7 @@ describe("POST /_admin/cleanup", () => {
       dryRun: false,
       temp: { success: true, data: { scanned: 0, removed: 0, skipped: 0, errors: 0 } },
       orphans: { success: true, data: { scanned: 2, removed: 1, skipped: 0, errors: 0 } },
+      uploads: { success: true, data: { scanned: 0, removed: 0, skipped: 0, errors: 0 } },
     });
     expect(existsSync(orphan)).toBe(false);
     expect(existsSync(blobPath("b", object.id))).toBe(true);

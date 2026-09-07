@@ -2,7 +2,7 @@ import { Elysia } from "elysia";
 import { useAuth } from "../middleware";
 import { Cleanup } from "$/modules/validation/cleanup";
 import { validate } from "$/lib/error";
-import { sweepOrphanBlobs, sweepTempFiles } from "$/modules/storage/cleanup";
+import { sweepAbandonedUploads, sweepOrphanBlobs, sweepTempFiles } from "$/modules/storage/cleanup";
 import { config } from "$/config";
 
 export const cleanupRoutes = new Elysia({
@@ -21,6 +21,10 @@ export const cleanupRoutes = new Elysia({
       orphans: await sweepOrphanBlobs({
         dryRun: input.dryRun,
         olderThanMs: config.CLEANUP_OLDER_THAN_MS,
+      }),
+      uploads: await sweepAbandonedUploads({
+        dryRun: input.dryRun,
+        olderThanMs: config.CLEANUP_UPLOAD_OLDER_THAN_MS,
       }),
     };
   });

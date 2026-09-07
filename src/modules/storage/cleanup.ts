@@ -40,6 +40,7 @@ type Outcome = (typeof OUTCOMES)[number];
 type Counts = Record<Outcome, number>;
 
 const TEMP_PATH = path.resolve(BASE_PATH, TEMP_DIR_NAME);
+const UPLOADS_PATH = path.resolve(BASE_PATH, UPLOADS_DIR_NAME);
 const Uuid = type("string.uuid");
 
 function emptyCounts(): Counts {
@@ -147,6 +148,63 @@ async function sweepBucketDir(
     log.error({ path: dir, err }, "could not remove bucket dir");
     return { counts, failures: 1 };
   }
+}
+
+// A session is a row plus a file. Either can outlive the other: a crash
+// between the two writes in create, or an abort whose unlink failed. This
+// collects both, and like every other sweep it only touches what the age gate
+// says is old — a file with no row is also what a session looks like for a
+// moment while it is being opened.
+export async function sweepAbandonedUploads(
+  opts: SweepOptions,
+): Promise<SweepResult> {
+  const cutoff = Date.now() - opts.olderThanMs;
+  const counts = emptyCounts();
+  let failures = 0;
+
+  const stale = await db.orm.Upload.select("id", "bucketName", "key")
+    .where((u) => u.updatedAt.lt(new Date(cutoff)))
+    .all();
+
+  for (const row of stale) {
+    counts[await sweepFile(path.resolve(UPLOADS_PATH, row.id), cutoff, opts.dryRun)]++;
+    if (opts.dryRun) continue;
+
+    try {
+      await db.orm.Upload.where({ id: row.id }).delete();
+      log.warn(
+        { uploadId: row.id, bucket: row.bucketName, key: row.key },
+        "abandoned upload collected",
+      );
+    } catch (err) {
+      log.error({ uploadId: row.id, err }, "could not delete abandoned upload");
+      failures++;
+    }
+  }
+
+  // Files whose row is already gone. The row is the truth, so anything here
+  // that no session claims is garbage once it is past the gate.
+  const owned = new Set(
+    (await db.orm.Upload.select("id").all()).map((u) => u.id),
+  );
+
+  try {
+    for await (const entry of await fs.opendir(UPLOADS_PATH)) {
+      if (owned.has(entry.name)) {
+        counts.owned++;
+      } else if (Uuid(entry.name) instanceof type.errors) {
+        log.warn({ path: UPLOADS_PATH, entry: entry.name }, "not an upload file, leaving alone");
+        counts["not-a-uuid"]++;
+      } else {
+        counts[await sweepFile(path.resolve(UPLOADS_PATH, entry.name), cutoff, opts.dryRun)]++;
+      }
+    }
+  } catch (err) {
+    log.error({ path: UPLOADS_PATH, err }, "could not read uploads dir");
+    return { success: false, code: "FS_ERROR" };
+  }
+
+  return { success: true, data: summarize(counts, failures) };
 }
 
 export async function sweepTempFiles(opts: SweepOptions): Promise<SweepResult> {

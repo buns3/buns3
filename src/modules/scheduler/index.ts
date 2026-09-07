@@ -1,5 +1,6 @@
 import { logger } from "$/lib/logger";
 import {
+  sweepAbandonedUploads,
   sweepOrphanBlobs,
   sweepTempFiles,
   type SweepOptions,
@@ -50,9 +51,10 @@ export function initScheduler(opts: SchedulerOptions) {
     if (running) return;
     running = true;
 
-    const [tempResult, blobResult] = await Promise.allSettled([
+    const [tempResult, blobResult, uploadResult] = await Promise.allSettled([
       sweepTempFiles({ dryRun, olderThanMs }),
       sweepOrphanBlobs({ dryRun, olderThanMs }),
+      sweepAbandonedUploads({ dryRun, olderThanMs: config.CLEANUP_UPLOAD_OLDER_THAN_MS }),
     ]);
 
     if (tempResult.status === "fulfilled")
@@ -62,6 +64,10 @@ export function initScheduler(opts: SchedulerOptions) {
     if (blobResult.status === "fulfilled")
       report("orphan", dryRun, blobResult.value, forceLog);
     else log.error({ err: blobResult.reason, label: "orphan" }, "sweep threw");
+
+    if (uploadResult.status === "fulfilled")
+      report("upload", dryRun, uploadResult.value, forceLog);
+    else log.error({ err: uploadResult.reason, label: "upload" }, "sweep threw");
 
     running = false;
   }

@@ -74,7 +74,8 @@ origin, no path or trailing slash, because presigned URLs are built from it.
 | `CLEANUP_ENABLED` | `1` | `0` disables the scheduled sweeps; `POST /_admin/cleanup` still works. |
 | `CLEANUP_DRY_RUN` | `0` | `1` makes the scheduled sweeps report without removing. |
 | `CLEANUP_RUN_ON_STARTUP` | `1` | Run a sweep when the server starts, so a deploy shows its report immediately. |
-| `CLEANUP_OLDER_THAN_MS` | `3600000` | The age gate. Floor 60000: a small gate races live uploads. |
+| `CLEANUP_OLDER_THAN_MS` | `3600000` | The age gate for temp files and orphaned blobs. Floor 60000: a small gate races live uploads. |
+| `CLEANUP_UPLOAD_OLDER_THAN_MS` | `86400000` | How long an untouched upload session survives. Floor 3600000. |
 | `CLEANUP_INTERVAL_MS` | `900000` | Sweep interval. Floor 60000. |
 
 Flags are exactly `0` or `1`; anything else is a startup error rather than a
@@ -218,7 +219,7 @@ characters up to 1024, defined after percent-decoding — clients must encode.
 | `GET /_admin/keys` | All keys — names, hints, capabilities, last-used. Never hashes. |
 | `POST /_admin/keys` | Mint a key. Either a global admin key or a bucket-scoped data key with at least one of read/write. The token appears in this response and nowhere else. |
 | `DELETE /_admin/keys/:id` | Revoke. The bearer gets 401 on its very next request. |
-| `POST /_admin/cleanup` | Run the garbage sweeps now. Body `{"dryRun": bool}` (default false). Returns `{dryRun, temp, orphans}` with per-sweep counts; one sweep failing never fails the other. The age gate is the server's, never the caller's. |
+| `POST /_admin/cleanup` | Run the garbage sweeps now (temp files, orphaned blobs, abandoned uploads). Body `{"dryRun": bool}` (default false). Returns `{dryRun, temp, orphans}` with per-sweep counts; one sweep failing never fails the other. The age gate is the server's, never the caller's. |
 
 ### Self
 
@@ -376,9 +377,10 @@ page pulls a documentation bundle from a public CDN at an unpinned version —
 third-party JavaScript executing on the same origin as your objects, which is
 fine on a laptop and not on a deployment.
 
-**Garbage is collected by age, never by absence alone.** Two sweeps run every
-fifteen minutes and on startup: stale files in `.tmp` (a crash mid-upload)
-and blobs with no pointer (a failed unlink, logged as an orphan at the time).
+**Garbage is collected by age, never by absence alone.** Three sweeps run
+every fifteen minutes and on startup: stale files in `.tmp` (a crash
+mid-upload), blobs with no pointer (a failed unlink, logged as an orphan at the
+time), and upload sessions nobody has touched in a day.
 Both remove only what is older than an hour, because a blob without a pointer
 is also exactly what every in-flight upload looks like for a moment, and so is
 a freshly created bucket's empty directory. A sweep that trusted absence alone
@@ -402,7 +404,7 @@ this one) are claims about it.
 ## Development
 
 ```bash
-bun test              # 582 tests, ~3s, server and SDK
+bun test              # 634 tests, ~5s, server and SDK
 bun x tsc --noEmit    # Bun does not type-check; this does
 bun run dev           # watch mode on :8000
 ```
