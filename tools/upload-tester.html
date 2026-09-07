@@ -63,7 +63,8 @@
       <h1><span>buns3</span> tester</h1>
       <button class="small" id="theme"></button>
     </div>
-    <p class="sub">every request below is made by <code>@buns3/sdk</code>; the log shows the wire it produced</p>
+    <p class="sub">every request below is made by <code>@buns3/sdk</code>; the log shows the wire it produced.
+      presigning needs <code>crypto.subtle</code>, so serve this page over https or from localhost — a <code>file://</code> page has no crypto at all.</p>
 
     <div class="banner" id="loaderr" hidden></div>
 
@@ -117,6 +118,7 @@
         <div><label>ttl (seconds)</label><input type="number" id="pttl" value="600" min="0" /></div>
       </div>
       <button id="presign">presign object</button>
+      <button id="presignsession">presign a session</button>
       <button id="follow">follow it (anonymous)</button>
       <pre id="presigned" class="sub" style="word-break:break-all"></pre>
     </fieldset>
@@ -135,7 +137,9 @@
       deriveKeyId,
       sign,
       buildPresignedUrl,
-    } from "https://esm.sh/@buns3/sdk@0.2.1";
+      signUpload,
+      buildUploadPresignedUrl,
+    } from "https://esm.sh/@buns3/sdk@0.2.2";
 
     const $ = (id) => document.getElementById(id);
     const store = {
@@ -306,6 +310,59 @@
         sig: await sign({ tokenHash, method: $("pmethod").value.toUpperCase(), bucket: bucket(), key: probeKey(), expires }),
       });
       $("presigned").textContent = url;
+    }));
+
+    // The browser case: the server opens a session, this page signs it, and
+    // every chunk afterwards travels with no credentials of its own.
+    $("presignsession").addEventListener("click", () => busy($("presignsession"), async () => {
+      const token = $("key").value;
+      const f = file();
+      if (!token || !f) { $("presigned").textContent = "needs an api key and a file"; return; }
+
+      const created = note(
+        await client().uploads.create({
+          bucket: bucket(),
+          key: keyOf(),
+          contentType: $("ctype").value || undefined,
+        }),
+        "create session",
+      );
+      if (!created.success) return;
+
+      const { uploadId } = created.data.upload;
+      const tokenHash = await hashToken(token);
+      const expires = Math.floor(Date.now() / 1000) + (Number($("pttl").value) || 600);
+      const url = buildUploadPresignedUrl($("base").value.replace(/\/+$/, ""), uploadId, {
+        keyId: await deriveKeyId(tokenHash),
+        expires,
+        sig: await signUpload({ tokenHash, uploadId, expires }),
+      });
+      $("presigned").textContent = url;
+
+      // drive it anonymously, exactly as a browser holding only the URL would
+      const anonymous = new Buns3Client($("base").value, { fetch: loggedFetch });
+      const bar = $("progress");
+      bar.hidden = false;
+      bar.value = 0;
+      try {
+        let offset = 0;
+        const chunkSize = Number($("chunk").value) || 8 * 1024 ** 2;
+        while (offset < f.size) {
+          const chunkUrl = url.replace("?", "?offset=" + offset + "&");
+          const res = await fetch(chunkUrl, {
+            method: "PATCH",
+            body: f.slice(offset, offset + chunkSize),
+          });
+          if (!res.ok) { append({ ok: false, status: `${res.status}`, method: "PATCH", url, ms: 0, headers: "", body: await res.text() }); return; }
+          const json = await res.json();
+          offset = json.upload.size;
+          bar.value = f.size === 0 ? 1 : offset / f.size;
+        }
+        const done = await fetch(url.replace("?", "/complete?"), { method: "POST" });
+        append({ ok: done.ok, status: `${done.status} ${done.statusText}`, method: "POST", url: url.replace("?", "/complete?"), ms: 0, headers: "", body: await done.text() });
+      } finally {
+        setTimeout(() => { bar.hidden = true; }, 1500);
+      }
     }));
 
     $("follow").addEventListener("click", () => busy($("follow"), async () => {
