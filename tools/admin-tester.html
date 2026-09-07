@@ -4,11 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>buns3 admin</title>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <!-- pin Babel 7: v8's react preset defaults to the automatic JSX runtime, which emits
-       import statements that cannot run in a classic script tag -->
-  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
   <script>
     // set theme before styles paint (no flash); stored choice wins over OS preference
     try {
@@ -41,7 +36,7 @@
     .sub { color: var(--muted); margin: 0 0 20px; }
     fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin: 0 0 12px; }
     label { display: block; color: var(--muted); font-size: 12px; margin: 8px 0 2px; }
-    input[type=text], input[type=password], select { width: 100%; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; font: inherit; }
+    input[type=text], input[type=password], input[type=number], select { width: 100%; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; font: inherit; }
     input:focus, select:focus { outline: none; border-color: var(--accent); }
     input:disabled { opacity: 0.4; }
     .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; } .row > div { flex: 1; min-width: 140px; }
@@ -51,6 +46,7 @@
     button.danger:hover { border-color: var(--err); color: var(--err); }
     button.small { padding: 3px 10px; margin: 0 4px 0 0; font-size: 12px; }
     .check { display: inline-flex; align-items: center; gap: 6px; margin: 10px 16px 0 0; color: var(--muted); }
+    .check label { margin: 0; }
     table { width: 100%; border-collapse: collapse; margin-top: 4px; }
     th { text-align: left; color: var(--muted); font-size: 12px; font-weight: normal; padding: 4px 8px; border-bottom: 1px solid var(--border); }
     td { padding: 6px 8px; border-bottom: 1px solid var(--divider); }
@@ -64,278 +60,412 @@
     .entry .status { font-weight: 700; } .ok .status { color: var(--ok); } .err .status { color: var(--err); }
     .entry .meta { color: var(--muted); font-size: 12px; }
     .entry pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-all; color: var(--pre); font-size: 12px; max-height: 200px; overflow: auto; }
+    .banner { border: 1px solid var(--err); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; color: var(--err); }
   </style>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="text/babel" data-presets="react">
-    const { useState, useCallback } = React;
+  <div class="wrap">
+    <div class="titlebar">
+      <h1><span>buns3</span> admin</h1>
+      <button class="small" id="theme"></button>
+    </div>
+    <p class="sub">
+      the control plane, driven by <code>@buns3/sdk</code>. an admin key cannot touch object data,
+      so the presign section takes a data key of its own.
+    </p>
 
+    <div class="banner" id="loaderr" hidden></div>
+
+    <h2>Connection</h2>
+    <fieldset>
+      <label>server</label>
+      <input type="text" id="base" />
+      <label>admin token (stored in localStorage)</label>
+      <input type="password" id="token" placeholder="buns3_…" />
+      <button id="whoami">whoami</button>
+      <button id="serverinfo">server</button>
+      <button id="health">health</button>
+    </fieldset>
+
+    <h2>Buckets</h2>
+    <fieldset>
+      <div class="row">
+        <div><label>new bucket</label><input type="text" id="newbucket" placeholder="^[a-z][a-z0-9-]*$, max 20" /></div>
+      </div>
+      <button class="primary" id="createbucket">create</button>
+      <button id="refreshbuckets">refresh</button>
+      <div id="buckets"></div>
+    </fieldset>
+
+    <h2>Mint API key</h2>
+    <fieldset>
+      <div class="row">
+        <div><label>name</label><input type="text" id="keyname" placeholder="ci uploader" /></div>
+        <div>
+          <label>kind</label>
+          <select id="keykind">
+            <option value="data">data (bucket-scoped)</option>
+            <option value="admin">admin (global, control plane only)</option>
+          </select>
+        </div>
+        <div><label>bucket</label><input type="text" id="keybucket" /></div>
+      </div>
+      <div class="check"><input type="checkbox" id="canread" checked /><label for="canread">canRead</label></div>
+      <div class="check"><input type="checkbox" id="canwrite" /><label for="canwrite">canWrite</label></div>
+      <p class="sub" style="margin:8px 0 0">write does not imply read; an admin key gets neither, by design.</p>
+      <button class="primary" id="mintkey">mint</button>
+      <div class="token-box" id="tokenbox" hidden>
+        <span class="warn">shown once — the server keeps only a hash</span>
+        <span id="mintedtoken"></span>
+        <div><button class="small" id="copytoken">copy</button></div>
+      </div>
+    </fieldset>
+
+    <h2>Keys</h2>
+    <fieldset>
+      <button id="refreshkeys">refresh</button>
+      <div id="keys"></div>
+    </fieldset>
+
+    <h2>Presign</h2>
+    <fieldset>
+      <p class="sub" style="margin:0 0 4px">
+        a key can only presign what it could do itself, so this needs a data key — not the admin token above.
+      </p>
+      <label>data key</label>
+      <input type="password" id="presignkey" placeholder="buns3_…" />
+      <div class="row">
+        <div>
+          <label>method</label>
+          <select id="pmethod"><option>GET</option><option>HEAD</option><option>PUT</option><option>DELETE</option></select>
+        </div>
+        <div><label>bucket</label><input type="text" id="pbucket" /></div>
+        <div><label>key</label><input type="text" id="pkey" /></div>
+        <div><label>ttl (s)</label><input type="number" id="pttl" value="3600" min="0" /></div>
+      </div>
+      <button id="mintserver">mint (server)</button>
+      <button id="mintoffline">mint (offline)</button>
+      <pre id="presigned" class="sub" style="word-break:break-all"></pre>
+      <button class="small" id="copyurl" hidden>copy</button>
+    </fieldset>
+
+    <h2>Cleanup</h2>
+    <fieldset>
+      <p class="sub" style="margin:0 0 4px">
+        runs the three sweeps now: stale temp files, orphaned blobs, abandoned upload sessions.
+        the age gate is the server's and cannot be set from here.
+      </p>
+      <div class="check"><input type="checkbox" id="dryrun" checked /><label for="dryrun">dryRun — report without removing</label></div>
+      <div><button id="cleanup">run sweeps</button></div>
+    </fieldset>
+
+    <h2>Log</h2>
+    <div class="log" id="log"><p class="sub">nothing yet</p></div>
+  </div>
+
+  <script type="module">
+    // Pinned exactly: this page is served from a bucket on the same origin as
+    // your objects, so a floating version would be third-party code that can
+    // change under you.
+    import {
+      Buns3AdminClient,
+      Buns3Client,
+      hashToken,
+      deriveKeyId,
+      sign,
+      buildPresignedUrl,
+    } from "https://esm.sh/@buns3/sdk@0.2.2";
+
+    const $ = (id) => document.getElementById(id);
     const store = {
       get: (k, fallback) => { try { return localStorage.getItem(k) ?? fallback; } catch { return fallback; } },
       set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
     };
 
-    function App() {
-      const [base, setBase] = useState(store.get("buns3.base", location.origin.startsWith("http") ? location.origin : "http://localhost:8000"));
-      const [token, setToken] = useState(store.get("buns3.adminToken", ""));
-      const [busy, setBusy] = useState(false);
-      const [log, setLog] = useState([]);
-      const [buckets, setBuckets] = useState(null);
-      const [newBucket, setNewBucket] = useState("");
-      const [keyForm, setKeyForm] = useState({ name: "", kind: "data", bucketName: "", canRead: true, canWrite: false });
-      const [mintedToken, setMintedToken] = useState(null);
-      const [copied, setCopied] = useState(false);
+    $("base").value = store.get("buns3.base", location.origin.startsWith("http") ? location.origin : "http://localhost:8000");
+    $("token").value = store.get("buns3.adminToken", "");
+    $("presignkey").value = store.get("buns3.presignKey", "");
+    for (const [id, k] of [["base", "buns3.base"], ["token", "buns3.adminToken"], ["presignkey", "buns3.presignKey"]]) {
+      $(id).addEventListener("input", () => store.set(k, $(id).value));
+    }
 
-      const persist = (setter, storeKey) => (e) => { setter(e.target.value); store.set(storeKey, e.target.value); };
-      const api = (path) => `${base.replace(/\/$/, "")}${path}`;
+    const logEl = $("log");
+    function append({ ok, status, method, url, ms, note, body }) {
+      if (logEl.firstElementChild?.tagName === "P") logEl.replaceChildren();
+      const entry = document.createElement("div");
+      entry.className = "entry " + (ok ? "ok" : "err");
+      const head = document.createElement("div");
+      head.className = "head";
+      const st = document.createElement("span");
+      st.className = "status";
+      st.textContent = status;
+      const where = document.createElement("span");
+      where.textContent = `${method} ${url.replace($("base").value.replace(/\/+$/, ""), "") || "/"}`;
+      const meta = document.createElement("span");
+      meta.className = "meta";
+      meta.textContent = `${ms}ms${note ? " · " + note : ""}`;
+      head.append(st, where, meta);
+      entry.append(head);
+      if (body) {
+        const pre = document.createElement("pre");
+        pre.textContent = body.length > 1500 ? `${body.slice(0, 1500)}\n… (${body.length} bytes total)` : body;
+        entry.append(pre);
+      }
+      logEl.prepend(entry);
+    }
 
-      const run = useCallback(async (method, path, body, tokenOverride) => {
-        setBusy(true);
-        const started = performance.now();
-        let entry, json = null;
-        const bearer = tokenOverride ?? token;
-        try {
-          const resp = await fetch(api(path), {
-            method,
-            headers: {
-              ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
-              ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-            },
-            body: body !== undefined ? JSON.stringify(body) : undefined,
-          });
-          const ms = Math.round(performance.now() - started);
-          const text = method === "HEAD" ? "" : await resp.text();
-          try { json = text ? JSON.parse(text) : null; } catch {}
-          entry = { ok: resp.ok, status: `${resp.status} ${resp.statusText}`, method, path, ms, body: text.length > 1500 ? text.slice(0, 1500) + "…" : text };
-        } catch (err) {
-          entry = { ok: false, status: "network error", method, path, ms: Math.round(performance.now() - started), body: String(err) };
+    // The SDK's fetch seam: every request it makes passes through here, so the
+    // log shows the wire rather than what this page intended to send.
+    async function loggedFetch(input, init = {}) {
+      const url = typeof input === "string" ? input : input.url;
+      const method = init.method ?? "GET";
+      const started = performance.now();
+      try {
+        const res = await fetch(input, init);
+        const body = await res.clone().text().catch(() => "");
+        append({
+          ok: res.ok, status: `${res.status} ${res.statusText}`, method, url,
+          ms: Math.round(performance.now() - started), body,
+        });
+        return res;
+      } catch (err) {
+        append({
+          ok: false, status: "network error", method, url,
+          ms: Math.round(performance.now() - started), body: String(err),
+        });
+        throw err;
+      }
+    }
+
+    const base = () => $("base").value;
+    const admin = () => new Buns3AdminClient(base(), { token: $("token").value, fetch: loggedFetch });
+
+    // A failure that never reached the wire has no log entry of its own.
+    function note(result, label) {
+      if (!result.success) {
+        append({ ok: false, status: `${result.status} ${result.code}`, method: "", url: label, ms: 0, body: result.detail ?? "" });
+      }
+      return result;
+    }
+
+    async function busy(fn) {
+      const buttons = document.querySelectorAll("button");
+      buttons.forEach((b) => (b.disabled = true));
+      try { await fn(); } finally { buttons.forEach((b) => (b.disabled = false)); }
+    }
+
+    function table(head, rows) {
+      const t = document.createElement("table");
+      const thead = document.createElement("tr");
+      for (const h of head) {
+        const th = document.createElement("th");
+        th.textContent = h;
+        thead.append(th);
+      }
+      t.append(thead);
+      for (const cells of rows) {
+        const tr = document.createElement("tr");
+        for (const c of cells) {
+          const td = document.createElement("td");
+          if (c instanceof Node) td.append(c); else td.textContent = c;
+          tr.append(td);
         }
-        setLog((l) => [{ id: Date.now() + Math.random(), ...entry }, ...l]);
-        setBusy(false);
-        return { ok: entry.ok, json };
-      }, [base, token]);
-
-      async function refreshBuckets() {
-        const { ok, json } = await run("GET", "/_admin/buckets");
-        setBuckets(ok ? json.buckets : null);
+        t.append(tr);
       }
+      return t;
+    }
 
-      async function createBucket() {
-        if (!newBucket) return;
-        const { ok } = await run("PUT", `/_admin/buckets/${newBucket}`);
-        if (ok) { setNewBucket(""); refreshBuckets(); }
-      }
+    function smallButton(text, cls, onClick) {
+      const b = document.createElement("button");
+      b.className = "small " + cls;
+      b.textContent = text;
+      b.addEventListener("click", onClick);
+      return b;
+    }
 
-      async function togglePublic(b) {
-        const { ok } = await run("PATCH", `/_admin/buckets/${b.name}`, { publicRead: !b.publicRead });
-        if (ok) refreshBuckets();
-      }
-
-      async function deleteBucket(b) {
-        if (!confirm(`DELETE bucket "${b.name}"? (refused if non-empty; scoped keys cascade away)`)) return;
-        const { ok } = await run("DELETE", `/_admin/buckets/${b.name}`);
-        if (ok) refreshBuckets();
-      }
-
-      const [keys, setKeys] = useState(null);
-      const [presignKey, setPresignKey] = useState(store.get("buns3.presignKey", ""));
-      const [ps, setPs] = useState({ method: "GET", bucket: "", key: "", ttl: "3600" });
-      const psf = (patch) => setPs((f) => ({ ...f, ...patch }));
-      const [presigned, setPresigned] = useState(null);
-      const [copiedUrl, setCopiedUrl] = useState(false);
-
-      async function mintUrl() {
-        const { ok, json } = await run("POST", "/_self/presign", {
-          method: ps.method,
-          bucket: ps.bucket,
-          key: ps.key,
-          ttl: Number(ps.ttl),
-        }, presignKey);
-        setPresigned(ok ? { url: json.url, method: ps.method } : null);
-        setCopiedUrl(false);
-      }
-
-      async function copyUrl() {
-        try { await navigator.clipboard.writeText(presigned.url); setCopiedUrl(true); } catch {}
-      }
-
-      async function refreshKeys() {
-        const { ok, json } = await run("GET", "/_admin/keys");
-        setKeys(ok ? json.apiKeys : null);
-      }
-
-      async function revokeKey(k) {
-        if (!confirm(`Revoke key "${k.name}" (${k.tokenHint}…)? Its bearer 401s immediately.`)) return;
-        const { ok } = await run("DELETE", `/_admin/keys/${k.id}`);
-        if (ok) refreshKeys();
-      }
-
-      async function mintKey() {
-        const isAdmin = keyForm.kind === "admin";
-        const payload = isAdmin
-          ? { name: keyForm.name, bucketName: null, canRead: false, canWrite: false, isAdmin: true }
-          : { name: keyForm.name, bucketName: keyForm.bucketName, canRead: keyForm.canRead, canWrite: keyForm.canWrite, isAdmin: false };
-        const { ok, json } = await run("POST", "/_admin/keys", payload);
-        if (ok) { setMintedToken(json.token); setCopied(false); }
-      }
-
-      async function copyToken() {
-        try { await navigator.clipboard.writeText(mintedToken); setCopied(true); } catch {}
-      }
-
-      const kf = (patch) => setKeyForm((f) => ({ ...f, ...patch }));
-
-      const [theme, setTheme] = useState(document.documentElement.dataset.theme);
-      function toggleTheme() {
-        const next = theme === "light" ? "dark" : "light";
-        document.documentElement.dataset.theme = next;
-        try { localStorage.setItem("buns3.theme", next); } catch {}
-        setTheme(next);
-      }
-
-      return (
-        <div className="wrap">
-          <div className="titlebar">
-            <h1><span>buns3</span> admin</h1>
-            <button className="small" onClick={toggleTheme}>{theme === "light" ? "☾ dark" : "☀ light"}</button>
-          </div>
-          <p className="sub">control plane only — needs an admin token (data-plane testing lives in the upload tester)</p>
-
-          <h2>Connection</h2>
-          <fieldset>
-            <div className="row">
-              <div><label>server</label><input type="text" value={base} onChange={persist(setBase, "buns3.base")} /></div>
-              <div><label>admin token (stored in localStorage)</label><input type="password" value={token} onChange={persist(setToken, "buns3.adminToken")} placeholder="buns3_…" /></div>
-            </div>
-            <button disabled={busy} onClick={() => run("GET", "/_self")}>whoami</button>
-          </fieldset>
-
-          <h2>Buckets</h2>
-          <fieldset>
-            <button className="primary" disabled={busy} onClick={refreshBuckets}>refresh list</button>
-            {buckets && (
-              <table>
-                <thead><tr><th>name</th><th>objects</th><th>publicRead</th><th>createdAt</th><th></th></tr></thead>
-                <tbody>
-                  {buckets.map((b) => (
-                    <tr key={b.name}>
-                      <td>{b.name}</td>
-                      <td>{b.objects}</td>
-                      <td className={b.publicRead ? "on" : "off"}>{String(b.publicRead)}</td>
-                      <td className="off">{new Date(b.createdAt).toISOString().slice(0, 19)}Z</td>
-                      <td>
-                        <button className="small" disabled={busy} onClick={() => togglePublic(b)}>{b.publicRead ? "make private" : "make public"}</button>
-                        <button className="small danger" disabled={busy} onClick={() => deleteBucket(b)}>delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-            <div className="row">
-              <div><label>new bucket name</label><input type="text" value={newBucket} onChange={(e) => setNewBucket(e.target.value)} placeholder="lowercase, ≤20 chars" /></div>
-              <div><button disabled={busy || !newBucket} onClick={createBucket}>create</button></div>
-            </div>
-          </fieldset>
-
-          <h2>Mint API key</h2>
-          <fieldset>
-            <div className="row">
-              <div><label>name</label><input type="text" value={keyForm.name} onChange={(e) => kf({ name: e.target.value })} /></div>
-              <div>
-                <label>kind</label>
-                <select value={keyForm.kind} onChange={(e) => kf({ kind: e.target.value })}>
-                  <option value="data">bucket data key</option>
-                  <option value="admin">global admin key</option>
-                </select>
-              </div>
-              <div><label>bucket (data keys only)</label><input type="text" value={keyForm.bucketName} disabled={keyForm.kind === "admin"} onChange={(e) => kf({ bucketName: e.target.value })} /></div>
-            </div>
-            <label className="check"><input type="checkbox" checked={keyForm.canRead} disabled={keyForm.kind === "admin"} onChange={(e) => kf({ canRead: e.target.checked })} /> canRead</label>
-            <label className="check"><input type="checkbox" checked={keyForm.canWrite} disabled={keyForm.kind === "admin"} onChange={(e) => kf({ canWrite: e.target.checked })} /> canWrite</label>
-            <div>
-              <button className="primary" disabled={busy || !keyForm.name} onClick={mintKey}>mint</button>
-            </div>
-            {mintedToken && (
-              <div className="token-box">
-                <span className="warn">shown once — the server keeps only a hash. Save it now.</span>
-                {mintedToken}
-                <div><button className="small" onClick={copyToken}>{copied ? "copied ✓" : "copy"}</button></div>
-              </div>
-            )}
-          </fieldset>
-
-          <h2>Keys</h2>
-          <fieldset>
-            <button className="primary" disabled={busy} onClick={refreshKeys}>refresh list</button>
-            {keys && (
-              <table>
-                <thead><tr><th>name</th><th>hint</th><th>scope</th><th>caps</th><th>last used</th><th></th></tr></thead>
-                <tbody>
-                  {keys.map((k) => (
-                    <tr key={k.id}>
-                      <td>{k.name}</td>
-                      <td className="off">{k.tokenHint}…</td>
-                      <td>{k.isAdmin ? "global" : k.bucketName}</td>
-                      <td className="off">{k.isAdmin ? "admin" : [k.canRead && "read", k.canWrite && "write"].filter(Boolean).join("+")}</td>
-                      <td className="off">{k.lastUsedAt ? new Date(k.lastUsedAt).toISOString().slice(0, 16) + "Z" : "never"}</td>
-                      <td><button className="small danger" disabled={busy} onClick={() => revokeKey(k)}>revoke</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </fieldset>
-
-          <h2>Presign</h2>
-          <fieldset>
-            <p className="sub" style={{ marginBottom: 4 }}>
-              needs a <em>data</em> key — the admin token above structurally cannot presign
-              (control plane only); a key can only presign what it could do itself
-            </p>
-            <label>data key (stored in localStorage)</label>
-            <input type="password" value={presignKey} onChange={persist(setPresignKey, "buns3.presignKey")} placeholder="buns3_…" />
-            <div className="row">
-              <div>
-                <label>method</label>
-                <select value={ps.method} onChange={(e) => psf({ method: e.target.value })}>
-                  {["GET", "HEAD", "PUT", "DELETE"].map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
-              <div><label>bucket</label><input type="text" value={ps.bucket} onChange={(e) => psf({ bucket: e.target.value })} /></div>
-              <div><label>key</label><input type="text" value={ps.key} onChange={(e) => psf({ key: e.target.value })} /></div>
-              <div><label>ttl (s, max 604800)</label><input type="text" value={ps.ttl} onChange={(e) => psf({ ttl: e.target.value })} /></div>
-            </div>
-            <button className="primary" disabled={busy || !presignKey || !ps.bucket || !ps.key} onClick={mintUrl}>presign</button>
-            {presigned && (
-              <div className="token-box">
-                <span className="warn">anyone holding this URL can {presigned.method} until it expires or the key is revoked</span>
-                <a href={presigned.url} target="_blank" rel="noreferrer">{presigned.url}</a>
-                <div><button className="small" onClick={copyUrl}>{copiedUrl ? "copied ✓" : "copy"}</button></div>
-              </div>
-            )}
-          </fieldset>
-
-          <h2>Log</h2>
-          <div className="log">
-            {log.length === 0 && <p className="sub">nothing yet</p>}
-            {log.map((e) => (
-              <div key={e.id} className={"entry " + (e.ok ? "ok" : "err")}>
-                <div className="head">
-                  <span className="status">{e.status}</span>
-                  <span>{e.method} {e.path}</span>
-                  <span className="meta">{e.ms}ms</span>
-                </div>
-                {e.body && <pre>{e.body}</pre>}
-              </div>
-            ))}
-          </div>
-        </div>
+    async function refreshBuckets() {
+      const res = note(await admin().admin.buckets.list(), "list buckets");
+      if (!res.success) return;
+      $("buckets").replaceChildren(
+        table(
+          ["name", "objects", "public", ""],
+          res.data.buckets.map((b) => {
+            const flag = document.createElement("span");
+            flag.className = b.publicRead ? "on" : "off";
+            flag.textContent = b.publicRead ? "public" : "private";
+            const actions = document.createElement("span");
+            actions.append(
+              smallButton(b.publicRead ? "make private" : "make public", "", () =>
+                busy(async () => {
+                  note(await admin().admin.buckets.update(b.name, { publicRead: !b.publicRead }), "update bucket");
+                  await refreshBuckets();
+                }),
+              ),
+              smallButton("delete", "danger", () =>
+                busy(async () => {
+                  if (!confirm(`delete bucket "${b.name}"? refused if non-empty; scoped keys cascade away.`)) return;
+                  note(await admin().admin.buckets.delete(b.name), "delete bucket");
+                  await refreshBuckets();
+                }),
+              ),
+            );
+            return [b.name, String(b.objects), flag, actions];
+          }),
+        ),
       );
     }
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    async function refreshKeys() {
+      const res = note(await admin().admin.keys.list(), "list keys");
+      if (!res.success) return;
+      $("keys").replaceChildren(
+        table(
+          ["name", "bucket", "capabilities", "hint", "last used", ""],
+          res.data.apiKeys.map((k) => {
+            const caps = [k.isAdmin && "admin", k.canRead && "read", k.canWrite && "write"].filter(Boolean).join(" ") || "none";
+            return [
+              k.name,
+              k.bucketName ?? "—",
+              caps,
+              k.tokenHint + "…",
+              k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleString() : "never",
+              smallButton("revoke", "danger", () =>
+                busy(async () => {
+                  if (!confirm(`revoke "${k.name}" (${k.tokenHint}…)? its bearer 401s on the next request.`)) return;
+                  note(await admin().admin.keys.delete(k.id), "revoke key");
+                  await refreshKeys();
+                }),
+              ),
+            ];
+          }),
+        ),
+      );
+    }
+
+    $("keykind").addEventListener("change", () => {
+      const isAdmin = $("keykind").value === "admin";
+      for (const id of ["keybucket", "canread", "canwrite"]) $(id).disabled = isAdmin;
+    });
+
+    $("createbucket").addEventListener("click", () => busy(async () => {
+      const name = $("newbucket").value;
+      if (!name) return;
+      const res = note(await admin().admin.buckets.create(name), "create bucket");
+      if (res.success) $("newbucket").value = "";
+      await refreshBuckets();
+    }));
+    $("refreshbuckets").addEventListener("click", () => busy(refreshBuckets));
+    $("refreshkeys").addEventListener("click", () => busy(refreshKeys));
+
+    $("mintkey").addEventListener("click", () => busy(async () => {
+      const isAdmin = $("keykind").value === "admin";
+      const input = isAdmin
+        ? { name: $("keyname").value, bucketName: null, canRead: false, canWrite: false, isAdmin: true }
+        : {
+            name: $("keyname").value,
+            bucketName: $("keybucket").value,
+            canRead: $("canread").checked,
+            canWrite: $("canwrite").checked,
+            isAdmin: false,
+          };
+      const res = note(await admin().admin.keys.create(input), "mint key");
+      if (!res.success) return;
+      $("mintedtoken").textContent = res.data.token;
+      $("tokenbox").hidden = false;
+      await refreshKeys();
+    }));
+
+    $("copytoken").addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText($("mintedtoken").textContent); $("copytoken").textContent = "copied"; } catch {}
+    });
+
+    $("whoami").addEventListener("click", () => busy(async () => {
+      note(await admin().self.whoami(), "whoami");
+    }));
+    $("serverinfo").addEventListener("click", () => busy(async () => {
+      note(await admin().server.get(), "server");
+    }));
+    $("health").addEventListener("click", () => busy(async () => {
+      // Unauthenticated by design, so it goes through a tokenless client.
+      await loggedFetch(`${base().replace(/\/+$/, "")}/_health`);
+    }));
+
+    // Two ways to mint the same URL. The server-signed one proves the key could
+    // perform the operation; the offline one never leaves the browser.
+    function presignArgs() {
+      return {
+        method: $("pmethod").value,
+        bucket: $("pbucket").value,
+        key: $("pkey").value,
+        ttl: Number($("pttl").value) || 0,
+      };
+    }
+
+    function showUrl(url) {
+      $("presigned").textContent = url;
+      $("copyurl").hidden = !url;
+      $("copyurl").textContent = "copy";
+    }
+
+    $("mintserver").addEventListener("click", () => busy(async () => {
+      const token = $("presignkey").value;
+      if (!token) { showUrl("needs a data key"); return; }
+      const data = new Buns3Client(base(), { token, fetch: loggedFetch });
+      const res = note(await data.self.presign(presignArgs()), "presign (server)");
+      showUrl(res.success ? res.data.url : "");
+    }));
+
+    $("mintoffline").addEventListener("click", () => busy(async () => {
+      const token = $("presignkey").value;
+      if (!token) { showUrl("needs a data key"); return; }
+      const { method, bucket, key, ttl } = presignArgs();
+      const tokenHash = await hashToken(token);
+      const expires = Math.floor(Date.now() / 1000) + ttl;
+      showUrl(
+        buildPresignedUrl(base().replace(/\/+$/, ""), bucket, key, {
+          keyId: await deriveKeyId(tokenHash),
+          expires,
+          sig: await sign({ tokenHash, method, bucket, key, expires }),
+        }),
+      );
+    }));
+
+    $("copyurl").addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText($("presigned").textContent); $("copyurl").textContent = "copied"; } catch {}
+    });
+
+    $("cleanup").addEventListener("click", () => busy(async () => {
+      // No SDK method for this yet; it is an admin-plane endpoint the client
+      // does not model.
+      await loggedFetch(`${base().replace(/\/+$/, "")}/_admin/cleanup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${$("token").value}` },
+        body: JSON.stringify({ dryRun: $("dryrun").checked }),
+      });
+    }));
+
+    const themeBtn = $("theme");
+    function paintTheme() {
+      themeBtn.textContent = document.documentElement.dataset.theme === "light" ? "☾ dark" : "☀ light";
+    }
+    themeBtn.addEventListener("click", () => {
+      const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+      document.documentElement.dataset.theme = next;
+      try { localStorage.setItem("buns3.theme", next); } catch {}
+      paintTheme();
+    });
+    paintTheme();
+  </script>
+  <script type="module">
+    // A module that fails to import is silent; say so rather than showing a
+    // page whose buttons do nothing.
+    setTimeout(() => {
+      if (!document.getElementById("theme").textContent) {
+        const b = document.getElementById("loaderr");
+        b.hidden = false;
+        b.textContent = "could not load @buns3/sdk from esm.sh — check the network tab";
+      }
+    }, 4000);
   </script>
 </body>
 </html>
