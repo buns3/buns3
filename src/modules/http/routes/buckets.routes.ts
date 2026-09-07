@@ -12,7 +12,7 @@ export const bucketsRoutes = new Elysia({
   .use(useAuth)
 
   .get("/buckets", { auth: "admin" }, async () => {
-    const { buckets } = unwrap(await bucketStorage.list());
+    const { data: buckets } = unwrap(await bucketStorage.list());
     return { buckets };
   })
 
@@ -20,7 +20,7 @@ export const bucketsRoutes = new Elysia({
     "/buckets/:bucket",
     { auth: "admin", bucket: true },
     async ({ bucket: bucketName }) => {
-      const { bucket } = unwrap(await bucketStorage.get(bucketName));
+      const { data: bucket } = unwrap(await bucketStorage.get(bucketName));
       return { bucket };
     },
   )
@@ -29,7 +29,7 @@ export const bucketsRoutes = new Elysia({
     "/buckets/:bucket",
     { auth: "admin", bucket: true },
     async ({ set, bucket: bucketName }) => {
-      const { bucket } = unwrap(await bucketStorage.create(bucketName));
+      const { data: bucket } = unwrap(await bucketStorage.create(bucketName));
 
       set.headers["location"] = `/${bucketName}`;
       return status(201, { bucket });
@@ -42,7 +42,9 @@ export const bucketsRoutes = new Elysia({
     async ({ bucket: bucketName, body }) => {
       const input = validate(BucketUpdate, body);
 
-      const { bucket } = unwrap(await bucketStorage.update(bucketName, input));
+      const { data: bucket } = unwrap(
+        await bucketStorage.update(bucketName, input),
+      );
       return status(200, { bucket });
     },
   )

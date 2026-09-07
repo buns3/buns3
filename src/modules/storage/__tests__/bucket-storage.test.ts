@@ -14,10 +14,10 @@ describe("bucketStorage.create", () => {
     const result = await bucketStorage.create("alpha");
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.bucket.name).toBe("alpha");
-    expect(result.bucket.publicRead).toBe(false);
-    expect(result.bucket.objects).toBe(0);
-    expect(result.bucket.createdAt).toBeInstanceOf(Date);
+    expect(result.data.name).toBe("alpha");
+    expect(result.data.publicRead).toBe(false);
+    expect(result.data.objects).toBe(0);
+    expect(result.data.createdAt).toBeInstanceOf(Date);
     expect(existsSync(bucketDir("alpha"))).toBe(true);
   });
 
@@ -36,7 +36,7 @@ describe("bucketStorage.get / head / list", () => {
     const result = await bucketStorage.get("alpha");
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.bucket.objects).toBe(2);
+    expect(result.data.objects).toBe(2);
   });
 
   test("get on a missing bucket is BUCKET_NOT_FOUND", async () => {
@@ -51,7 +51,7 @@ describe("bucketStorage.get / head / list", () => {
     const result = await bucketStorage.list();
     expect(result.success).toBe(true);
     if (!result.success) return;
-    const byName = Object.fromEntries(result.buckets.map((b) => [b.name, b.objects]));
+    const byName = Object.fromEntries(result.data.map((b) => [b.name, b.objects]));
     expect(byName).toEqual({ alpha: 0, beta: 1 });
   });
 });
@@ -60,9 +60,9 @@ describe("bucketStorage.update", () => {
   test("toggles publicRead and returns a boolean on the mapped bucket", async () => {
     await seedBucket("alpha");
     const on = await bucketStorage.update("alpha", { publicRead: true });
-    expect(on.success && on.bucket.publicRead).toBe(true);
+    expect(on.success && on.data.publicRead).toBe(true);
     const off = await bucketStorage.update("alpha", { publicRead: false });
-    expect(off.success && off.bucket.publicRead).toBe(false);
+    expect(off.success && off.data.publicRead).toBe(false);
   });
 
   test("update on a missing bucket is BUCKET_NOT_FOUND", async () => {

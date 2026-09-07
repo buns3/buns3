@@ -3,6 +3,7 @@ import type {
   Buns3ApiKeyErrorCode,
   Buns3PresignErrorCode,
 } from "$/lib/error-codes";
+import type { Result } from "$/lib/result";
 import type { Contract } from "../prisma/contract";
 import type { CreateApiKey } from "../validation/api-key";
 import type { PresignMethod } from "$/lib/presign";
@@ -18,25 +19,11 @@ export type ApiKey = Omit<
 };
 
 export type Buns3ApiKeyResult<TData> = Promise<
-  | {
-      success: true;
-      data: TData;
-    }
-  | {
-      success: false;
-      code: Buns3ApiKeyErrorCode;
-    }
+  Result<TData, Buns3ApiKeyErrorCode>
 >;
 
 export type Buns3ApiKeyPresignResult<TData> = Promise<
-  | {
-      success: true;
-      data: TData;
-    }
-  | {
-      success: false;
-      code: Buns3PresignErrorCode;
-    }
+  Result<TData, Buns3PresignErrorCode>
 >;
 
 export type VerifyPresignedOpts = {

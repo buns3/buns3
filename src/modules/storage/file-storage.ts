@@ -45,11 +45,7 @@ export const fileStorage: Buns3Storage = {
       return { success: false, code: "KEY_NOT_FOUND" };
     }
 
-    return {
-      success: true,
-      file,
-      object: existingObject,
-    };
+    return { success: true, data: { file, object: existingObject } };
   },
 
   async list(opts) {
@@ -72,9 +68,11 @@ export const fileStorage: Buns3Storage = {
 
     return {
       success: true,
-      filters: { limit, prefix, after },
-      nextAfter: objects.length > limit ? objects[limit - 1]!.key : null,
-      objects: objects.slice(0, limit).map(toObjectSummary),
+      data: {
+        filters: { limit, prefix, after },
+        nextAfter: objects.length > limit ? objects[limit - 1]!.key : null,
+        objects: objects.slice(0, limit).map(toObjectSummary),
+      },
     };
   },
 
@@ -157,7 +155,7 @@ export const fileStorage: Buns3Storage = {
         }
       }
 
-      return { success: true, file, object: newObject };
+      return { success: true, data: { file, object: newObject } };
     } catch (err) {
       log.error({ bucket, key, err }, "could not write blob");
       await Promise.allSettled([tempFile.unlink(), file.unlink()]);
@@ -189,7 +187,7 @@ export const fileStorage: Buns3Storage = {
       log.warn({ bucket, key, blobId: deleted.id, err }, "orphaned blob");
     }
 
-    return { success: true, file: null, object: deleted };
+    return { success: true, data: { file: null, object: deleted } };
   },
 
   async deleteMany(bucket, keys) {
@@ -203,12 +201,14 @@ export const fileStorage: Buns3Storage = {
     if (rows.length === 0) {
       return {
         success: true,
-        summary: { deleted: 0, missing: uniqueKeys.length },
-        results: uniqueKeys.map((key) => ({
-          success: false,
-          key,
-          code: "KEY_NOT_FOUND",
-        })),
+        data: {
+          summary: { deleted: 0, missing: uniqueKeys.length },
+          results: uniqueKeys.map((key) => ({
+            success: false,
+            key,
+            code: "KEY_NOT_FOUND",
+          })),
+        },
       };
     }
 
@@ -237,11 +237,13 @@ export const fileStorage: Buns3Storage = {
 
     return {
       success: true,
-      summary: {
-        deleted: deletedKeys.size,
-        missing: uniqueKeys.length - deletedKeys.size,
+      data: {
+        summary: {
+          deleted: deletedKeys.size,
+          missing: uniqueKeys.length - deletedKeys.size,
+        },
+        results,
       },
-      results,
     };
   },
 };

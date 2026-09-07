@@ -21,9 +21,7 @@ export const objectsRoutes = new Elysia({
       const filters = validate(ObjectListQuery, query);
 
       const {
-        objects,
-        filters: effectiveFilters,
-        nextAfter,
+        data: { objects, filters: effectiveFilters, nextAfter },
       } = unwrap(await fileStorage.list({ bucket, ...filters }));
 
       return {
@@ -42,9 +40,9 @@ export const objectsRoutes = new Elysia({
     async ({ bucket, body }) => {
       const input = validate(BatchDelete, body);
 
-      const { results, summary } = unwrap(
-        await fileStorage.deleteMany(bucket, input.keys),
-      );
+      const {
+        data: { results, summary },
+      } = unwrap(await fileStorage.deleteMany(bucket, input.keys));
 
       return { bucket, summary, results };
     },
@@ -57,7 +55,9 @@ export const objectsRoutes = new Elysia({
         { auth: "read", bucketKey: true },
         async ({ set, bucket, key, authState, headers }) => {
           const ifNoneMatch = headers["if-none-match"];
-          const { file, object } = unwrap(await fileStorage.get(bucket, key));
+          const {
+            data: { file, object },
+          } = unwrap(await fileStorage.get(bucket, key));
 
           applyValidatorHeaders(set.headers, object, authState.kind);
           if (ifNoneMatch && etagMatches(ifNoneMatch, `"${object.id}"`)) {
@@ -81,9 +81,9 @@ export const objectsRoutes = new Elysia({
           const contentType =
             headers["content-type"] ?? "application/octet-stream";
 
-          const { object } = unwrap(
-            await fileStorage.put(bucket, key, stream, contentType),
-          );
+          const {
+            data: { object },
+          } = unwrap(await fileStorage.put(bucket, key, stream, contentType));
 
           set.headers["location"] =
             `/${object.bucketName}/${uriEncodedKey(object.key)}`;
@@ -109,7 +109,9 @@ export const objectsRoutes = new Elysia({
         { auth: "read", bucketKey: true },
         async ({ set, bucket, key, authState, headers }) => {
           const ifNoneMatch = headers["if-none-match"];
-          const { object } = unwrap(await fileStorage.get(bucket, key));
+          const {
+            data: { object },
+          } = unwrap(await fileStorage.get(bucket, key));
 
           applyValidatorHeaders(set.headers, object, authState.kind);
           if (ifNoneMatch && etagMatches(ifNoneMatch, `"${object.id}"`)) {

@@ -17,7 +17,7 @@ try {
     console.warn("Creating DEV bucket... [FAIL]");
   } else {
     console.log(
-      `${result.bucket.name} - ${result.bucket.createdAt.toLocaleString()}`,
+      `${result.data.name} - ${result.data.createdAt.toLocaleString()}`,
     );
     console.log("Creating DEV bucket... [DONE]");
   }

@@ -40,7 +40,7 @@ export async function seedBucket(
     if (!updated.success)
       throw new Error(`seedBucket(${name}): ${updated.code}`);
   }
-  return created.bucket;
+  return created.data;
 }
 
 export async function seedKey(input: {
@@ -75,7 +75,7 @@ export async function seedObject(
   );
   if (!result.success)
     throw new Error(`seedObject(${bucket}/${key}): ${result.code}`);
-  return result.object;
+  return result.data.object;
 }
 
 export const dataPath = () => config.DATA_PATH;

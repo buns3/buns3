@@ -1,5 +1,6 @@
 import type { DefaultModelRow } from "@prisma/orm-sqlite/orm-client";
-import type { Buns3ErrorCode } from "$/lib/error-codes";
+import type { Buns3AnyErrorCode } from "$/lib/error-codes";
+import type { Result } from "$/lib/result";
 import type { Contract } from "../prisma/contract";
 import type { BucketUpdate } from "../validation/bucket";
 import type { ObjectListQuery } from "../validation/object";
@@ -17,71 +18,37 @@ export type ObjectSummary = Omit<ObjectRow, "bucketName" | "id"> & {
 };
 
 export type Buns3FileResult<TFile> = Promise<
-  | {
-      success: true;
-      file: TFile;
-      object: ObjectRow;
-    }
-  | {
-      success: false;
-      code: Buns3ErrorCode;
-    }
+  Result<{ file: TFile; object: ObjectRow }>
 >;
 
-export type Buns3BucketResult = Promise<
-  | {
-      success: true;
-      bucket: BucketWithCount;
-    }
-  | {
-      success: false;
-      code: Buns3ErrorCode;
-    }
->;
+export type Buns3BucketResult = Promise<Result<BucketWithCount>>;
 
-export type Buns3BucketListResult = Promise<
-  | {
-      success: true;
-      buckets: BucketWithCount[];
-    }
-  | {
-      success: false;
-      code: Buns3ErrorCode;
-    }
->;
+export type Buns3BucketListResult = Promise<Result<BucketWithCount[]>>;
 
-export type Buns3FileListResult = Promise<
-  | {
-      success: true;
-      filters: {
-        [k in keyof Required<ObjectListQuery>]: Exclude<
-          ObjectListQuery[k],
-          undefined
-        > | null;
-      };
-      nextAfter: string | null;
-      objects: ObjectSummary[];
-    }
-  | {
-      success: false;
-      code: Buns3ErrorCode;
-    }
->;
+export type ObjectListing = {
+  filters: {
+    [k in keyof Required<ObjectListQuery>]: Exclude<
+      ObjectListQuery[k],
+      undefined
+    > | null;
+  };
+  nextAfter: string | null;
+  objects: ObjectSummary[];
+};
 
+export type Buns3FileListResult = Promise<Result<ObjectListing>>;
+
+// The per-key shape is a WIRE contract, not a Result: it carries the key on
+// both branches so a caller can match responses to requests.
 export type Buns3BatchDeleteItemResult =
   | { success: true; key: string }
-  | { success: false; key: string; code: Buns3ErrorCode };
+  | { success: false; key: string; code: Buns3AnyErrorCode };
 
 export type Buns3BatchDeleteResult = Promise<
-  | {
-      success: true;
-      results: Buns3BatchDeleteItemResult[];
-      summary: { deleted: number; missing: number };
-    }
-  | {
-      success: false;
-      code: Buns3ErrorCode;
-    }
+  Result<{
+    results: Buns3BatchDeleteItemResult[];
+    summary: { deleted: number; missing: number };
+  }>
 >;
 
 export type StorageListOptions = {

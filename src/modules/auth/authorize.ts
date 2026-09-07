@@ -130,7 +130,7 @@ async function authorizeAnonymous(
   }
 
   const result = await bucketStorage.get(bucket);
-  if (!result.success || !result.bucket.publicRead) {
+  if (!result.success || !result.data.publicRead) {
     log.debug({ bucket, exists: result.success }, "anonymous read of a non-public bucket");
     return {
       success: false,

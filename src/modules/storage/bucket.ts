@@ -29,10 +29,7 @@ export const bucketStorage: Buns3BucketStorage = {
       };
     }
 
-    return {
-      success: true,
-      bucket: toBucketWithCount(existingBucket),
-    };
+    return { success: true, data: toBucketWithCount(existingBucket) };
   },
 
   async create(bucket) {
@@ -59,10 +56,7 @@ export const bucketStorage: Buns3BucketStorage = {
       });
 
       log.info({ bucket }, "bucket created");
-      return {
-        success: true,
-        bucket: toBucketWithCount(newBucket),
-      };
+      return { success: true, data: toBucketWithCount(newBucket) };
     } catch (err) {
       if (isUniqueViolation(err, "buckets.name")) {
         return {
@@ -99,10 +93,7 @@ export const bucketStorage: Buns3BucketStorage = {
     }
 
     log.info({ bucket, ...opts }, "bucket updated");
-    return {
-      success: true,
-      bucket: toBucketWithCount(updated),
-    };
+    return { success: true, data: toBucketWithCount(updated) };
   },
 
   async delete(bucket) {
@@ -160,19 +151,13 @@ export const bucketStorage: Buns3BucketStorage = {
     }
 
     log.info({ bucket }, "bucket deleted");
-    return {
-      success: true,
-      bucket: toBucketWithCount(deleted),
-    };
+    return { success: true, data: toBucketWithCount(deleted) };
   },
 
   async list() {
     const buckets = await db.orm.Bucket.include("objects", (o) =>
       o.count(),
     ).all();
-    return {
-      success: true,
-      buckets: buckets.map(toBucketWithCount),
-    };
+    return { success: true, data: buckets.map(toBucketWithCount) };
   },
 };
