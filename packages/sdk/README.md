@@ -105,6 +105,57 @@ Same six methods, delegating to the same code. It's a convenience rather than
 a scope: a data key is already bucket-scoped server-side, but tokens are opaque
 so the SDK can't read the bucket from one, and global data keys are planned.
 
+## Large files
+
+A proxy usually caps request bodies well below the server's own limit —
+Cloudflare at 100 MB — so a large file goes up in pieces:
+
+```ts
+await client.objects.putChunked(bucket, key, file, {
+  contentType: "video/mp4",
+  chunkSize: 8 * 1024 ** 2,
+  onProgress: (uploaded, total) => console.log(uploaded / total),
+});
+```
+
+It opens a session, appends the file in chunks and completes, answering
+exactly what `put` answers — the two are interchangeable to a caller.
+
+The body must be a `Blob`, which a browser `File` and `Bun.file(path)` both
+are. Slicing is what makes a chunk retryable and what gives the loop its
+bound; a `ReadableStream` can only be read once, so resuming after a failed
+chunk would be impossible. Wrap other sources yourself: `new Blob([buffer])`.
+
+Each chunk states the offset the server last recorded, and the server refuses
+one that disagrees. A failed chunk stops the upload and returns the server's
+own error — the session survives, so the same bytes can be resumed rather
+than resent. Sessions nobody touches are collected after a day.
+
+The plane underneath is there when you want the steps:
+
+```ts
+const { data } = await client.uploads.create({ bucket, key, contentType });
+const { uploadId } = data.upload;
+
+await client.uploads.append(uploadId, chunk, offset);
+await client.uploads.get(uploadId); // how far did it get?
+await client.uploads.complete(uploadId);
+await client.uploads.abort(uploadId);
+```
+
+A session can also be presigned, which is how a browser uploads without ever
+holding a key:
+
+```ts
+const { data } = await client.uploads.presign(uploadId, 3600);
+// hand data.url to the browser: it carries every chunk and the completion
+```
+
+One URL for the whole upload, because order and offset are the server's
+business rather than the client's. It does not carry `abort`: throwing the
+session away is destructive, and whoever opened it can do that with their own
+key.
+
 ## Presigned URLs
 
 Two ways to mint one.

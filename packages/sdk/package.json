@@ -48,9 +48,7 @@
   },
   "devDependencies": {
     "tsdown": "0.22.14",
-    "@types/bun": "catalog:dev"
-  },
-  "peerDependencies": {
+    "@types/bun": "catalog:dev",
     "typescript": "catalog:dev"
   }
 }
