@@ -1,6 +1,7 @@
 import { config } from "./config";
 import { logger } from "./lib/logger";
 import { initServer } from "./modules/http/server";
+import { db } from "./modules/prisma/db";
 import { initScheduler } from "./modules/scheduler";
 import { fileStorage } from "./modules/storage/file-storage";
 
@@ -11,6 +12,7 @@ async function shutdown(signal: NodeJS.Signals) {
   logger.info({ signal }, restarting ? "restarting" : "shutting down");
   stopScheduler();
   await server.stop();
+  await db.close();
   process.exit(0);
 }
 

@@ -4,6 +4,7 @@ model Bucket {
   createdAt  DateTime @map("created_at")
 
   objects Object[]
+  uploads Upload[]
   apiKeys ApiKey[]
 
   @@map("buckets")
@@ -20,6 +21,20 @@ model Object {
 
   @@unique([bucketName, key])
   @@map("objects")
+}
+
+model Upload {
+  id          String   @id
+  bucketName  String   @map("bucket_name")
+  bucket      Bucket   @relation(fields: [bucketName], references: [name], onDelete: Restrict)
+  key         String
+  contentType String   @map("content_type")
+  size        Int
+  createdAt   DateTime @map("created_at")
+  updatedAt   DateTime @map("updated_at")
+
+  @@index([bucketName])
+  @@map("uploads")
 }
 
 model ApiKey {

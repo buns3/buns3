@@ -1,0 +1,84 @@
+[
+  {
+    "id": "table.uploads",
+    "label": "Create table uploads",
+    "summary": "Creates table uploads with required columns",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "table",
+        "name": "uploads"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"uploads\" does not exist",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "uploads"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"uploads\"",
+        "sql": "CREATE TABLE \"uploads\" (\n  \"bucket_name\" TEXT NOT NULL,\n  \"content_type\" TEXT NOT NULL,\n  \"created_at\" TEXT NOT NULL,\n  \"id\" TEXT NOT NULL,\n  \"key\" TEXT NOT NULL,\n  \"size\" INTEGER NOT NULL,\n  \"updated_at\" TEXT NOT NULL,\n  PRIMARY KEY (\"id\"),\n  FOREIGN KEY (\"bucket_name\") REFERENCES \"buckets\" (\"name\") ON DELETE RESTRICT\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"uploads\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "uploads"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.uploads.uploads_bucket_name_idx_a0195dbd",
+    "label": "Create index uploads_bucket_name_idx_a0195dbd on uploads",
+    "summary": "Creates index uploads_bucket_name_idx_a0195dbd on uploads",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "index",
+        "name": "uploads_bucket_name_idx_a0195dbd",
+        "table": "uploads"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"uploads_bucket_name_idx_a0195dbd\" is missing",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "index",
+          "uploads_bucket_name_idx_a0195dbd"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"uploads_bucket_name_idx_a0195dbd\"",
+        "sql": "CREATE INDEX \"uploads_bucket_name_idx_a0195dbd\" ON \"uploads\" (\"bucket_name\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"uploads_bucket_name_idx_a0195dbd\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "index",
+          "uploads_bucket_name_idx_a0195dbd"
+        ]
+      }
+    ]
+  }
+]
