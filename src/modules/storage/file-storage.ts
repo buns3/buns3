@@ -2,28 +2,22 @@ import type { Buns3BatchDeleteItemResult, Buns3Storage } from "./types";
 import path from "node:path";
 import { rename, mkdir } from "node:fs/promises";
 import { db } from "$/modules/prisma/db";
-import { BASE_PATH, TEMP_DIR_NAME } from "./constants";
+import { BASE_PATH, TEMP_DIR_NAME, UPLOADS_DIR_NAME } from "./constants";
 import { toObjectSummary } from "./mapping";
 import { prefixUpperBound } from "$/lib/key";
 import { logger } from "$/lib/logger";
+import { resolveFile, resolveDirPath } from "./paths";
 
 const log = logger.child({ module: "storage" });
-
-function resolvePath(bucket: string, key: string) {
-  return path.resolve(BASE_PATH, bucket, key);
-}
-
-function resolve(bucket: string, key: string) {
-  const filePath = resolvePath(bucket, key);
-  return Bun.file(filePath);
-}
 
 export const fileStorage: Buns3Storage = {
   async init() {
     // Init the file system and directories
     const dataDir = path.resolve(BASE_PATH);
     const tempDir = path.resolve(dataDir, TEMP_DIR_NAME);
+    const uploadDir = path.resolve(dataDir, UPLOADS_DIR_NAME);
     await mkdir(tempDir, { recursive: true });
+    await mkdir(uploadDir, { recursive: true });
     log.debug({ path: dataDir }, "data dir ready");
   },
 
@@ -40,7 +34,7 @@ export const fileStorage: Buns3Storage = {
       };
     }
 
-    const file = resolve(bucket, existingObject.id);
+    const file = resolveFile(bucket, existingObject.id);
     if (!(await file.exists())) {
       return { success: false, code: "KEY_NOT_FOUND" };
     }
@@ -89,8 +83,8 @@ export const fileStorage: Buns3Storage = {
     }
 
     const rndKey = crypto.randomUUID();
-    const tempFilePath = resolvePath(TEMP_DIR_NAME, rndKey);
-    const tempFile = resolve(TEMP_DIR_NAME, rndKey);
+    const tempFilePath = resolveDirPath(TEMP_DIR_NAME, rndKey);
+    const tempFile = resolveFile(TEMP_DIR_NAME, rndKey);
     const sink = tempFile.writer();
 
     try {
@@ -101,7 +95,7 @@ export const fileStorage: Buns3Storage = {
       await sink.end();
     } catch (err) {
       log.error({ bucket, key, err }, "could not write blob");
-      await tempFile.unlink();
+      await Promise.allSettled([tempFile.unlink()]);
       return {
         success: false,
         code: "FS_ERROR",
@@ -109,8 +103,8 @@ export const fileStorage: Buns3Storage = {
     }
 
     const id = crypto.randomUUID();
-    const filePath = resolvePath(bucket, id);
-    const file = resolve(bucket, id);
+    const filePath = resolveDirPath(bucket, id);
+    const file = resolveFile(bucket, id);
 
     try {
       const [existingObject, newObject] = await db.transaction(async (tx) => {
@@ -149,9 +143,12 @@ export const fileStorage: Buns3Storage = {
       if (existingObject) {
         try {
           // Unlink old file -> replaced by new one
-          await resolve(bucket, existingObject.id).unlink();
+          await resolveFile(bucket, existingObject.id).unlink();
         } catch (err) {
-          log.warn({ bucket, key, blobId: existingObject.id, err }, "orphaned blob");
+          log.warn(
+            { bucket, key, blobId: existingObject.id, err },
+            "orphaned blob",
+          );
         }
       }
 
@@ -181,7 +178,7 @@ export const fileStorage: Buns3Storage = {
     }
 
     try {
-      const file = resolve(bucket, deleted.id);
+      const file = resolveFile(bucket, deleted.id);
       await file.unlink();
     } catch (err) {
       log.warn({ bucket, key, blobId: deleted.id, err }, "orphaned blob");
@@ -222,9 +219,12 @@ export const fileStorage: Buns3Storage = {
     await Promise.all(
       deletedRows.map(async (row) => {
         try {
-          await resolve(bucket, row.id).unlink();
+          await resolveFile(bucket, row.id).unlink();
         } catch (err) {
-          log.warn({ bucket, key: row.key, blobId: row.id, err }, "orphaned blob");
+          log.warn(
+            { bucket, key: row.key, blobId: row.id, err },
+            "orphaned blob",
+          );
         }
       }),
     );

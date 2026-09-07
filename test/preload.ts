@@ -39,6 +39,7 @@ if (existsSync(ROOT)) {
 const runDir = path.join(ROOT, `run-${crypto.randomUUID().slice(0, 8)}`);
 const dataDir = path.join(runDir, "data");
 mkdirSync(path.join(dataDir, ".tmp"), { recursive: true });
+mkdirSync(path.join(dataDir, ".uploads"), { recursive: true });
 
 process.env.SQLITE_PATH = path.join(runDir, "db.sqlite");
 process.env.DATA_PATH = dataDir;

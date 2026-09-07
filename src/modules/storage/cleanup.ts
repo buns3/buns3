@@ -5,7 +5,7 @@ import { type } from "arktype";
 import type { Buns3ErrorCode } from "$/lib/error-codes";
 import { db } from "$/modules/prisma/db";
 import { BucketName } from "$/modules/validation/bucket";
-import { BASE_PATH, TEMP_DIR_NAME } from "./constants";
+import { BASE_PATH, TEMP_DIR_NAME, UPLOADS_DIR_NAME } from "./constants";
 import { isErrnoException } from "./errors";
 import { logger } from "$/lib/logger";
 
@@ -92,9 +92,10 @@ async function sweepFile(
 
 function classifyRootEntry(
   entry: Dirent,
-): "bucket" | "temp" | "file" | "unknown" {
+): "bucket" | "temp" | "upload" | "file" | "unknown" {
   if (!entry.isDirectory()) return "file";
   if (entry.name === TEMP_DIR_NAME) return "temp";
+  if (entry.name === UPLOADS_DIR_NAME) return "upload";
   return BucketName(entry.name) instanceof type.errors ? "unknown" : "bucket";
 }
 
@@ -181,6 +182,7 @@ export async function sweepOrphanBlobs(
       switch (classifyRootEntry(entry)) {
         case "file":
         case "temp":
+        case "upload":
           continue;
         case "unknown":
           log.warn(

@@ -17,12 +17,13 @@ export async function resetStorage() {
   // where-less deleteAll) even though the runtime executes them — probed. The
   // always-true predicate is the accepted tax for a deliberate full wipe.
   await db.orm.Object.where((o) => o.id.isNotNull()).deleteAll();
+  await db.orm.Upload.where((u) => u.id.isNotNull()).deleteAll();
   await db.orm.ApiKey.where((k) => k.id.isNotNull()).deleteAll();
   await db.orm.Bucket.where((b) => b.name.isNotNull()).deleteAll();
 
   const dataPath = config.DATA_PATH;
   for (const entry of readdirSync(dataPath)) {
-    if (entry === ".tmp") continue;
+    if (entry === ".tmp" || entry === ".uploads") continue;
     rmSync(path.join(dataPath, entry), { recursive: true, force: true });
   }
 }
