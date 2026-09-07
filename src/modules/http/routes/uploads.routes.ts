@@ -2,10 +2,17 @@ import { Elysia, status } from "elysia";
 import { useAuth, useUpload } from "../middleware";
 import { Buns3Error, unwrap, validate } from "$/lib/error";
 import { toUpload } from "$/modules/storage/mapping";
-import { AppendQuery, CreateUpload } from "$/modules/validation/upload";
+import {
+  AppendQuery,
+  CreateUpload,
+  UploadPresignRequest,
+} from "$/modules/validation/upload";
 import { authorize } from "$/modules/auth/authorize";
 import { uploadStorage } from "$/modules/storage/upload-storage";
 import { uriEncodedKey } from "$/lib/request";
+import { apiKeyStorage } from "$/modules/api-keys/api-key-storage";
+import { buildUploadPresignedUrl } from "$/lib/presign";
+import { config } from "$/config";
 
 export const uploadsRoutes = new Elysia({
   name: "routes:uploads",
@@ -82,5 +89,32 @@ export const uploadsRoutes = new Elysia({
 
       unwrap(await uploadStorage.abort(params.id));
       return status(204, null);
+    },
+  )
+
+  .post(
+    "/:id/presign",
+    { upload: true, auth: "write" },
+    async ({ upload, params, authState, body }) => {
+      if (upload === null) throw new Buns3Error("UPLOAD_NOT_FOUND");
+      const { ttl } = validate(UploadPresignRequest, body);
+      if (authState.kind !== "key") throw new Buns3Error("INVALID_API_KEY");
+
+      const { data } = unwrap(
+        await apiKeyStorage.presignUpload({
+          id: authState.apiKey.id,
+          uploadId: params.id,
+          ttl,
+        }),
+      );
+
+      return {
+        url: buildUploadPresignedUrl(config.BASE_URL, upload.id, {
+          expires: data.expires,
+          keyId: data.keyId,
+          sig: data.sig,
+        }),
+        expires: data.expires,
+      };
     },
   );

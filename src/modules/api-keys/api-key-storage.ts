@@ -10,6 +10,7 @@ import {
   deriveKeyId,
   hashToken,
   sign,
+  signUpload,
   verify,
   verifyUpload,
 } from "$/lib/presign";
@@ -180,6 +181,38 @@ export const apiKeyStorage: Buns3ApiKeyStorage = {
       bucket,
       key,
       method,
+      expires,
+    });
+
+    return {
+      success: true,
+      data: {
+        expires,
+        keyId,
+        sig,
+      },
+    };
+  },
+
+  async presignUpload(opts) {
+    const { id, uploadId, ttl } = opts;
+
+    const apiKey = await db.orm.ApiKey.select("tokenHash")
+      .where({ id })
+      .first();
+
+    if (!apiKey) {
+      return {
+        success: false,
+        code: "INVALID_API_KEY",
+      };
+    }
+
+    const keyId = deriveKeyId(apiKey.tokenHash);
+    const expires = Math.floor(Date.now() / 1000) + ttl;
+    const sig = signUpload({
+      tokenHash: apiKey.tokenHash,
+      uploadId,
       expires,
     });
 

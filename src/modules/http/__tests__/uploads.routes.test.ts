@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { createServer } from "../server";
 import { deriveKeyId, hashToken, signUpload } from "$/lib/presign";
+import { config } from "$/config";
 import {
   resetStorage,
   seedBucket,
@@ -386,5 +387,70 @@ describe("presigned upload sessions", () => {
 
     expect((await req("GET", "/a/scoped.bin", { token: write })).status).toBe(200);
     expect((await req("GET", "/other/scoped.bin", { token: elsewhere })).status).toBe(404);
+  });
+});
+
+describe("POST /_uploads/:id/presign", () => {
+  const mint = (id: string, body: unknown, token?: string) =>
+    app.handle(
+      new Request(`${BASE}/_uploads/${id}/presign`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      }),
+    );
+
+  test("mints a URL that works with no credentials on the request", async () => {
+    const id = await open("minted.bin");
+    const res = await mint(id, { ttl: 600 }, write);
+    expect(res.status).toBe(200);
+
+    const { url, expires } = (await res.json()) as { url: string; expires: number };
+    expect(url).toContain(`/_uploads/${id}?`);
+    expect(expires).toBeGreaterThan(Math.floor(Date.now() / 1000));
+
+    const local = url.replace(config.BASE_URL, BASE);
+    expect((await app.handle(new Request(local, { method: "PATCH", body: "bytes" }))).status).toBe(200);
+    expect(await sizeOf(id)).toBe(5);
+  });
+
+  test("a URL cannot mint another URL", async () => {
+    // Presigned credentials are a grant to finish one upload, not to hand out
+    // further grants.
+    const id = await open();
+    const minted = await mint(id, { ttl: 600 }, write);
+    const { url } = (await minted.json()) as { url: string };
+    const query = url.slice(url.indexOf("?"));
+
+    const res = await app.handle(
+      new Request(`${BASE}/_uploads/${id}/presign${query}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ttl: 60 }),
+      }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  test.each([
+    ["a read-only key", () => readOnly, 403],
+    ["a key scoped elsewhere", () => elsewhere, 403],
+    ["no credentials", () => undefined, 401],
+  ])("%s cannot mint", async (_label, token, expected) => {
+    const id = await open();
+    expect((await mint(id, { ttl: 600 }, token())).status).toBe(expected);
+  });
+
+  test("the ttl is capped, so a URL cannot outlive the session by much", async () => {
+    const id = await open();
+    expect((await mint(id, { ttl: 60 * 60 * 24 * 8 }, write)).status).toBe(422);
+    expect((await mint(id, { ttl: -1 }, write)).status).toBe(422);
+  });
+
+  test("an unknown session is a 404 for a valid key", async () => {
+    expect((await mint(crypto.randomUUID(), { ttl: 60 }, write)).status).toBe(404);
   });
 });

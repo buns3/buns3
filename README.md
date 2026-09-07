@@ -229,8 +229,9 @@ characters up to 1024, defined after percent-decoding — clients must encode.
 | `DELETE /_self` | Revoke the presented key. Any key may destroy itself. |
 | `POST /_self/presign` | `{"method", "bucket", "key", "ttl"}` → a presigned URL. A key can only presign operations it could perform itself. |
 
-An upload session can also be presigned, signed over the session id rather than
-a method and key, so a single URL carries every chunk and the completion. It
+`POST /_uploads/:id/presign` does the same for an upload session, signing the
+session id rather than a method and key, so a single URL carries every chunk
+and the completion. It
 does not carry `DELETE`: aborting is destructive, and whoever opened the
 session can do it with their own key.
 
@@ -409,7 +410,7 @@ this one) are claims about it.
 ## Development
 
 ```bash
-bun test              # 659 tests, ~5s, server and SDK
+bun test              # 666 tests, ~6s, server and SDK
 bun x tsc --noEmit    # Bun does not type-check; this does
 bun run dev           # watch mode on :8000
 ```

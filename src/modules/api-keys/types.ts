@@ -52,6 +52,12 @@ export type PresignOpts = {
   method: PresignMethod;
 };
 
+export type PresignUploadOpts = {
+  id: string;
+  uploadId: string;
+  ttl: number;
+};
+
 export type PresignData = { keyId: string; expires: number; sig: string };
 
 export interface Buns3ApiKeyStorage {
@@ -64,6 +70,8 @@ export interface Buns3ApiKeyStorage {
   ): Buns3ApiKeyPresignResult<ApiKey>;
 
   presign(opts: PresignOpts): Buns3ApiKeyResult<PresignData>;
+
+  presignUpload(opts: PresignUploadOpts): Buns3ApiKeyResult<PresignData>;
 
   create(
     input: CreateApiKey,
