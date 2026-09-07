@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { createServer } from "../server";
+import { deriveKeyId, hashToken, signUpload } from "$/lib/presign";
 import {
   resetStorage,
   seedBucket,
@@ -273,5 +274,117 @@ describe("DELETE /_uploads/:id", () => {
     const id = await open();
     await req("DELETE", `/_uploads/${id}`, { token: write });
     expect((await req("DELETE", `/_uploads/${id}`, { token: write })).status).toBe(404);
+  });
+});
+
+describe("presigned upload sessions", () => {
+  // A session IS the grant: one signature covers every chunk and the finish,
+  // because order and offset are the server's business. That is what makes
+  // this cheaper than S3 multipart, which needs a presign per part.
+  const expires = () => Math.floor(Date.now() / 1000) + 600;
+
+  const signed = async (
+    uploadId: string,
+    over: Record<string, string | number> = {},
+  ) => {
+    const tokenHash = hashToken(write);
+    const exp = expires();
+    const params = new URLSearchParams({
+      keyId: deriveKeyId(tokenHash),
+      expires: String(exp),
+      sig: signUpload({ tokenHash, uploadId, expires: exp }),
+      ...Object.fromEntries(
+        Object.entries(over).map(([k, v]) => [k, String(v)]),
+      ),
+    });
+    return `?${params}`;
+  };
+
+  const anon = (method: string, path: string, body?: string) =>
+    app.handle(new Request(`${BASE}${path}`, { method, body }));
+
+  test("one signature carries the whole upload, with no key on the request", async () => {
+    const id = await open("browser.bin");
+    const q = await signed(id);
+
+    expect((await anon("PATCH", `/_uploads/${id}${q}`, "one ")).status).toBe(200);
+    expect((await anon("PATCH", `/_uploads/${id}${q}`, "two")).status).toBe(200);
+
+    const got = await anon("GET", `/_uploads/${id}${q}`);
+    expect((await uploadOf(got)).size).toBe(7);
+
+    const done = await anon("POST", `/_uploads/${id}/complete${q}`);
+    expect(done.status).toBe(201);
+
+    const object = await req("GET", "/a/browser.bin", { token: write });
+    expect(await object.text()).toBe("one two");
+  });
+
+  test("aborting is not part of the grant", async () => {
+    // Destructive, and a browser never needs it — the minting client can abort
+    // with its own key. Cheap to add later, impossible to take back.
+    const id = await open();
+    const res = await anon("DELETE", `/_uploads/${id}${await signed(id)}`);
+    expect(res.status).toBe(401);
+    expect((await req("GET", `/_uploads/${id}`, { token: write })).status).toBe(200);
+  });
+
+  test("a signature for one session does not open another", async () => {
+    const mine = await open("mine.bin");
+    const yours = await open("yours.bin");
+
+    const res = await anon("PATCH", `/_uploads/${yours}${await signed(mine)}`, "x");
+    expect(res.status).toBe(401);
+    expect(await sizeOf(yours)).toBe(0);
+  });
+
+  test.each([
+    ["a tampered signature", { sig: "0".repeat(64) }],
+    ["a malformed signature", { sig: "nope" }],
+    ["an unknown keyId", { keyId: "f".repeat(64) }],
+  ])("%s is refused", async (_label, over) => {
+    const id = await open();
+    const res = await anon("PATCH", `/_uploads/${id}${await signed(id, over)}`, "x");
+    expect(res.status).toBe(401);
+    expect(await codeOf(res)).toBe("INVALID_API_KEY");
+  });
+
+  test("an expired signature says so, and the others do not", async () => {
+    // The one presign failure with its own code; everything else collapses to
+    // INVALID_API_KEY so a prober learns nothing.
+    const id = await open();
+    const res = await anon("PATCH", `/_uploads/${id}${await signed(id, { expires: 1 })}`, "x");
+    expect(res.status).toBe(401);
+    expect(await codeOf(res)).toBe("PRESIGNED_EXPIRED");
+  });
+
+  test("an unknown session answers exactly as a real one does, unsigned", async () => {
+    const real = await open();
+    const unknown = crypto.randomUUID();
+    const bad = { sig: "0".repeat(64) };
+
+    const toReal = await anon("GET", `/_uploads/${real}${await signed(real, bad)}`);
+    const toUnknown = await anon("GET", `/_uploads/${unknown}${await signed(unknown, bad)}`);
+    expect(toReal.status).toBe(401);
+    expect(await toReal.text()).toBe(await toUnknown.text());
+  });
+
+  test("an upload signature is not a data-plane signature", async () => {
+    // Different identifier in the canonical string; neither can be replayed as
+    // the other.
+    const id = await open();
+    const res = await anon("GET", `/a/big.bin${await signed(id)}`);
+    expect(res.status).toBe(401);
+  });
+
+  test("the session's own bucket still bounds it", async () => {
+    // The signature proves the minter could write this session; the session
+    // was created against one bucket and key and cannot reach another.
+    const id = await open("scoped.bin");
+    await anon("PATCH", `/_uploads/${id}${await signed(id)}`, "data");
+    await anon("POST", `/_uploads/${id}/complete${await signed(id)}`);
+
+    expect((await req("GET", "/a/scoped.bin", { token: write })).status).toBe(200);
+    expect((await req("GET", "/other/scoped.bin", { token: elsewhere })).status).toBe(404);
   });
 });

@@ -52,4 +52,5 @@ export type AuthorizeOptions = {
   bucket?: string;
   key?: string;
   method: string;
+  uploadId?: string;
 };

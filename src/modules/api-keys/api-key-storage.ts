@@ -6,7 +6,13 @@ import { ApiKeyToken } from "../validation/api-key";
 import { TOKEN_PREFIX } from "./constants";
 import { toApiKey } from "./mapping";
 import type { Buns3ApiKeyStorage } from "./types";
-import { deriveKeyId, hashToken, sign, verify } from "$/lib/presign";
+import {
+  deriveKeyId,
+  hashToken,
+  sign,
+  verify,
+  verifyUpload,
+} from "$/lib/presign";
 import { logger } from "$/lib/logger";
 
 const log = logger.child({ module: "api-keys" });
@@ -59,7 +65,65 @@ export const apiKeyStorage: Buns3ApiKeyStorage = {
 
     const verifyResult = verify({ tokenHash: row.tokenHash, ...rest });
     if (!verifyResult.valid) {
-      log.debug({ keyId, failure: verifyResult.reason }, "presigned signature rejected");
+      log.debug(
+        { keyId, failure: verifyResult.reason },
+        "presigned signature rejected",
+      );
+      switch (verifyResult.reason) {
+        case "expired":
+          return {
+            success: false,
+            code: "PRESIGNED_EXPIRED",
+          };
+
+        case "mismatch":
+        default:
+          return {
+            success: false,
+            code: "INVALID_API_KEY",
+          };
+      }
+    }
+
+    const apiKey = await db.orm.ApiKey.where({
+      id: row.id,
+    }).update({
+      lastUsedAt: new Date(),
+    });
+
+    if (apiKey === null) {
+      return {
+        success: false,
+        code: "INVALID_API_KEY",
+      };
+    }
+
+    return {
+      success: true,
+      data: toApiKey(apiKey),
+    };
+  },
+
+  async verifyUploadPresigned(opts) {
+    const { keyId, ...rest } = opts;
+
+    // O(n) scan, keyId isn't stored, maybe add an indexed derived column if key count ever matters...
+    const rows = await db.orm.ApiKey.all();
+    const row = rows.find((k) => deriveKeyId(k.tokenHash) === opts.keyId);
+    if (!row) {
+      log.debug({ keyId }, "presign keyId matches no key");
+      return {
+        success: false,
+        code: "INVALID_API_KEY",
+      };
+    }
+
+    const verifyResult = verifyUpload({ tokenHash: row.tokenHash, ...rest });
+    if (!verifyResult.valid) {
+      log.debug(
+        { keyId, uploadId: opts.uploadId, failure: verifyResult.reason },
+        "presigned upload signature rejected",
+      );
       switch (verifyResult.reason) {
         case "expired":
           return {
@@ -166,7 +230,14 @@ export const apiKeyStorage: Buns3ApiKeyStorage = {
 
       const apiKey = toApiKey(createdApiKey);
       log.info(
-        { keyId: apiKey.id, name: apiKey.name, bucket: apiKey.bucketName, isAdmin: apiKey.isAdmin, canRead: apiKey.canRead, canWrite: apiKey.canWrite },
+        {
+          keyId: apiKey.id,
+          name: apiKey.name,
+          bucket: apiKey.bucketName,
+          isAdmin: apiKey.isAdmin,
+          canRead: apiKey.canRead,
+          canWrite: apiKey.canWrite,
+        },
         "api key created",
       );
       return {

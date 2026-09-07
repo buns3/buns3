@@ -40,6 +40,7 @@ function getAuthBeforeHandler(capability?: AuthorizeCapability) {
     request,
     bucket,
     key,
+    upload,
   }: {
     // typed by hand: our own derive above guarantees this at runtime
     // params re-declared optional, Elysia's Context claims it's always present
@@ -49,6 +50,8 @@ function getAuthBeforeHandler(capability?: AuthorizeCapability) {
     // from the bucketKey derive on data routes. validated + decoded
     bucket?: string;
     key?: string;
+    // from the useUpload derive
+    upload?: UploadRow | null;
   } & Omit<Context, "params">) => {
     unwrap(
       await authorize({
@@ -57,6 +60,7 @@ function getAuthBeforeHandler(capability?: AuthorizeCapability) {
         method: request.method,
         bucket: bucket ?? params?.bucket,
         key,
+        uploadId: upload?.id,
       }),
     );
   };
@@ -183,7 +187,11 @@ export const useLogger = (logger: Logger, opts: { clientIp: boolean }) =>
           path,
           status,
           ms: t0 === undefined ? undefined : Math.round(performance.now() - t0),
-          auth: authState?.kind,
+          auth:
+            // the 2 presign flavours differ by route, not by credentials
+            authState?.kind === "presign" && path.startsWith("/_uploads/")
+              ? "uploadPresign"
+              : authState?.kind,
           ip: opts.clientIp ? clientIpOf(request, server) : undefined,
         },
         "request",

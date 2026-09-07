@@ -8,7 +8,11 @@ import type {
   AuthorizeResult,
   ResolvedCredentialsResult,
 } from "./types";
-import { isPresignMethod, type PresignMethod } from "$/lib/presign";
+import {
+  isPresignMethod,
+  isUploadPresignMethod,
+  type PresignMethod,
+} from "$/lib/presign";
 import { apiKeyStorage } from "../api-keys/api-key-storage";
 import { logger } from "$/lib/logger";
 
@@ -91,13 +95,19 @@ function resolvePresignCredentials(
 export async function authorize(
   opts: AuthorizeOptions,
 ): Promise<AuthorizeResult> {
-  const { state, bucket, capability, method, key } = opts;
+  const { state, bucket, capability, method, key, uploadId } = opts;
 
   switch (state.kind) {
     case "anonymous":
       return authorizeAnonymous(capability, bucket);
 
     case "presign": {
+      // Same query params either way; the route is what distinguishes them. A
+      // session-signed URL grants that one upload, so it needs no bucket or key.
+      if (uploadId) {
+        return authorizeUploadPresign(state.params, { uploadId, method });
+      }
+
       return authorizePresign(state.params, {
         capability,
         bucket,
@@ -122,7 +132,10 @@ async function authorizeAnonymous(
   bucket?: string,
 ): Promise<AuthorizeResult> {
   if (capability !== "read" || !bucket) {
-    log.debug({ capability, bucket }, "anonymous request needs read on a bucket");
+    log.debug(
+      { capability, bucket },
+      "anonymous request needs read on a bucket",
+    );
     return {
       success: false,
       code: "INVALID_API_KEY",
@@ -131,7 +144,10 @@ async function authorizeAnonymous(
 
   const result = await bucketStorage.get(bucket);
   if (!result.success || !result.data.publicRead) {
-    log.debug({ bucket, exists: result.success }, "anonymous read of a non-public bucket");
+    log.debug(
+      { bucket, exists: result.success },
+      "anonymous read of a non-public bucket",
+    );
     return {
       success: false,
       code: "INVALID_API_KEY",
@@ -174,6 +190,38 @@ async function authorizePresign(
   return authorizeKey(result.data, capability, bucket);
 }
 
+async function authorizeUploadPresign(
+  params: PresignParams,
+  opts: {
+    uploadId?: string;
+    method: string;
+  },
+): Promise<AuthorizeResult> {
+  const { uploadId, method } = opts;
+
+  if (!uploadId || !isUploadPresignMethod(method)) {
+    log.debug(
+      { uploadId, method },
+      "presigned upload request outside the data plane",
+    );
+    return { success: false, code: "INVALID_API_KEY" };
+  }
+
+  const result = await apiKeyStorage.verifyUploadPresigned({
+    ...params,
+    uploadId,
+    now: Math.floor(Date.now() / 1000), // milliseconds -> unix seconds
+  });
+
+  if (!result.success) {
+    return result;
+  }
+
+  return {
+    success: true,
+  };
+}
+
 function authorizeKey(
   apiKey: ApiKey,
   capability?: AuthorizeCapability,
@@ -188,7 +236,10 @@ function authorizeKey(
   }
 
   if (!inScope(apiKey, bucket)) {
-    log.debug({ keyId: apiKey.id, keyBucket: apiKey.bucketName, bucket }, "key out of scope");
+    log.debug(
+      { keyId: apiKey.id, keyBucket: apiKey.bucketName, bucket },
+      "key out of scope",
+    );
     return {
       success: false,
       code: "API_KEY_SCOPE_MISMATCH",

@@ -1,9 +1,13 @@
 import { uriEncodedKey } from "./request";
 
 const IDENTIFIER = "buns3-presign-v1";
+const UPLOAD_IDENTIFIER = "buns3-presign-upload-v1";
 
 export const PRESIGN_METHODS = ["GET", "HEAD", "PUT", "DELETE"] as const;
 export type PresignMethod = (typeof PRESIGN_METHODS)[number];
+
+export const UPLOAD_PRESIGN_METHODS = ["GET", "POST", "PATCH"] as const;
+export type UploadPresignMethod = (typeof UPLOAD_PRESIGN_METHODS)[number];
 
 export type PresignVerifyResultReason = "expired" | "mismatch";
 export type PresignVerifyResult =
@@ -16,7 +20,16 @@ export type CanonicalStringOptions = {
   expires: number;
 };
 
+export type CanonicalUploadStringOptions = {
+  uploadId: string;
+  expires: number;
+};
+
 export type SignOptions = CanonicalStringOptions & {
+  tokenHash: string;
+};
+
+export type SignUploadOptions = CanonicalUploadStringOptions & {
   tokenHash: string;
 };
 
@@ -26,35 +39,16 @@ export type VerifyOptions = CanonicalStringOptions & {
   now: number;
 };
 
-export function hashToken(token: string) {
-  return new Bun.CryptoHasher("sha256").update(token).digest("hex");
-}
+export type VerifyUploadOptions = CanonicalUploadStringOptions & {
+  sig: string;
+  tokenHash: string;
+  now: number;
+};
 
-export function isPresignMethod(method: string): method is PresignMethod {
-  return (PRESIGN_METHODS as readonly string[]).includes(method);
-}
-
-export function deriveKeyId(tokenHash: string) {
-  return new Bun.CryptoHasher("sha256", tokenHash)
-    .update(IDENTIFIER)
-    .digest("hex");
-}
-
-export function canonicalString(opts: CanonicalStringOptions) {
-  // canonical strings -> "buns3-presign-v1\n" + method + "\n" + bucket + "\n" + key + \n + expires
-  return `${IDENTIFIER}\n${opts.method}\n${opts.bucket}\n${opts.key}\n${opts.expires}`;
-}
-
-export function sign(opts: SignOptions) {
-  const { tokenHash, ...canonicalOpts } = opts;
-  const canonical = canonicalString(canonicalOpts);
-
-  return new Bun.CryptoHasher("sha256", tokenHash)
-    .update(canonical)
-    .digest("hex");
-}
-
-export function verify(opts: VerifyOptions): PresignVerifyResult {
+function verifySignature(
+  canonical: string,
+  opts: { now: number; sig: string; expires: number },
+): PresignVerifyResult {
   const { now, sig, ...rest } = opts;
 
   if (now > rest.expires) {
@@ -72,7 +66,7 @@ export function verify(opts: VerifyOptions): PresignVerifyResult {
     };
   }
 
-  const expected = Buffer.from(sign(rest), "hex");
+  const expected = Buffer.from(canonical, "hex");
   const provided = Buffer.from(sig, "hex");
 
   if (!crypto.timingSafeEqual(provided, expected)) {
@@ -87,6 +81,64 @@ export function verify(opts: VerifyOptions): PresignVerifyResult {
   };
 }
 
+export function hashToken(token: string) {
+  return new Bun.CryptoHasher("sha256").update(token).digest("hex");
+}
+
+export function isPresignMethod(method: string): method is PresignMethod {
+  return (PRESIGN_METHODS as readonly string[]).includes(method);
+}
+
+export function isUploadPresignMethod(
+  method: string,
+): method is UploadPresignMethod {
+  return (UPLOAD_PRESIGN_METHODS as readonly string[]).includes(method);
+}
+
+export function deriveKeyId(tokenHash: string) {
+  return new Bun.CryptoHasher("sha256", tokenHash)
+    .update(IDENTIFIER)
+    .digest("hex");
+}
+
+export function canonicalString(opts: CanonicalStringOptions) {
+  // canonical strings -> "buns3-presign-v1\n" + method + "\n" + bucket + "\n" + key + \n + expires
+  return `${IDENTIFIER}\n${opts.method}\n${opts.bucket}\n${opts.key}\n${opts.expires}`;
+}
+
+export function canonicalUploadString(opts: CanonicalUploadStringOptions) {
+  // canonical upload strings -> "buns3-presign-upload-v1\n" + uploadId + "\n" +  expires
+  return `${UPLOAD_IDENTIFIER}\n${opts.uploadId}\n${opts.expires}`;
+}
+
+export function sign(opts: SignOptions) {
+  const { tokenHash, ...canonicalOpts } = opts;
+  const canonical = canonicalString(canonicalOpts);
+
+  return new Bun.CryptoHasher("sha256", tokenHash)
+    .update(canonical)
+    .digest("hex");
+}
+
+export function signUpload(opts: SignUploadOptions) {
+  const { tokenHash, ...canonicalOpts } = opts;
+  const canonical = canonicalUploadString(canonicalOpts);
+
+  return new Bun.CryptoHasher("sha256", tokenHash)
+    .update(canonical)
+    .digest("hex");
+}
+
+export function verify(opts: VerifyOptions): PresignVerifyResult {
+  const { now, sig, ...rest } = opts;
+  return verifySignature(sign(rest), { now, sig, expires: rest.expires });
+}
+
+export function verifyUpload(opts: VerifyUploadOptions): PresignVerifyResult {
+  const { now, sig, ...rest } = opts;
+  return verifySignature(signUpload(rest), { now, sig, expires: rest.expires });
+}
+
 export function buildPresignedUrl(
   base: string,
   bucket: string,
@@ -98,4 +150,14 @@ export function buildPresignedUrl(
   const searchParams = `keyId=${keyId}&expires=${expires}&sig=${sig}`;
 
   return `${base}/${bucket}/${encodedKey}?${searchParams}`;
+}
+
+export function buildUploadPresignedUrl(
+  base: string,
+  uploadId: string,
+  { keyId, expires, sig }: { keyId: string; expires: number; sig: string },
+) {
+  const searchParams = `keyId=${keyId}&expires=${expires}&sig=${sig}`;
+
+  return `${base}/_uploads/${uploadId}?${searchParams}`;
 }
