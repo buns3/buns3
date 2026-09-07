@@ -242,6 +242,26 @@ session can do it with their own key.
 | `GET /_server` | What this server is: `{"version"}`. Any valid key, admin or not. |
 | `GET /_health` | Readiness, unauthenticated: `{"status", "checks": {"db", "storage"}}`. 200 when the database answers and the data directory is writable, 503 otherwise. What the container healthcheck polls. |
 
+### Uploads
+
+A proxy usually caps request bodies well below the server's 5 GB limit —
+Cloudflare at 100 MB — so a large object goes up in chunks. A session is one
+row and one growing file; appending is sequential, so there is no part
+numbering and no assembly step.
+
+| | |
+|---|---|
+| `POST /_uploads` + `{"bucket", "key", "contentType"}` | Open a session. 201 with a `Location` pointing at it. |
+| `PATCH /_uploads/:id` | Append raw bytes. `?offset=` must match the recorded size, or 409 — that is how a resume proves where it is. |
+| `GET /_uploads/:id` | How far it got. Resume from `size`. |
+| `POST /_uploads/:id/complete` | Turn the session into an object. Answers exactly as `PUT` does. |
+| `DELETE /_uploads/:id` | Throw the session away. 204. |
+| `POST /_uploads/:id/presign` + `{"ttl"}` | One URL carrying every chunk and the completion, so a browser never holds a key. |
+
+Every route authorizes `write` on the session's own bucket. The recorded size
+is the truth: bytes written past it by a crashed append are discarded rather
+than kept. Sessions nobody touches are collected after a day.
+
 Errors are RFC 9457 problem+json with a machine-readable `code` field.
 401 means missing, malformed, or unknown credentials; 403 means authenticated
 but not allowed; 422 means the request itself is invalid — and validation runs
@@ -410,7 +430,7 @@ this one) are claims about it.
 ## Development
 
 ```bash
-bun test              # 666 tests, ~6s, server and SDK
+bun test              # 685 tests, ~6s, server and SDK
 bun x tsc --noEmit    # Bun does not type-check; this does
 bun run dev           # watch mode on :8000
 ```
