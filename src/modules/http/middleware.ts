@@ -4,8 +4,63 @@ import { Buns3Error, unwrap, validate } from "$/lib/error";
 import { Key } from "../validation/object";
 import { BucketName } from "../validation/bucket";
 import { authorize, resolveCredentials } from "../auth/authorize";
-import type { AuthorizeCapability, AuthState } from "../auth/types";
+import type {
+  AuthorizeCapability,
+  AuthState,
+  Credentials,
+} from "../auth/types";
 import type { Logger } from "pino";
+import { Id } from "../validation/upload";
+import { uploadStorage } from "../storage/upload-storage";
+import type { UploadRow } from "../storage/types";
+
+async function resolveAuthState(credentials: Credentials): Promise<AuthState> {
+  switch (credentials.kind) {
+    case "anonymous":
+      return { kind: "anonymous" };
+
+    case "presign":
+      return { kind: "presign", params: credentials.params };
+
+    case "bearer":
+      return {
+        kind: "key",
+        apiKey: unwrap(await apiKeyStorage.verify(credentials.token)).data,
+      };
+
+    default:
+      throw new Buns3Error("INVALID_API_KEY");
+  }
+}
+
+function getAuthBeforeHandler(capability?: AuthorizeCapability) {
+  return async ({
+    authState,
+    params,
+    request,
+    bucket,
+    key,
+  }: {
+    // typed by hand: our own derive above guarantees this at runtime
+    // params re-declared optional, Elysia's Context claims it's always present
+    // but it's undefined for param-less routes.
+    authState: AuthState;
+    params?: Record<string, string>;
+    // from the bucketKey derive on data routes. validated + decoded
+    bucket?: string;
+    key?: string;
+  } & Omit<Context, "params">) => {
+    unwrap(
+      await authorize({
+        state: authState,
+        capability,
+        method: request.method,
+        bucket: bucket ?? params?.bucket,
+        key,
+      }),
+    );
+  };
+}
 
 export const useBucketKey = new Elysia({ name: "middleware:bucket-key" }).macro(
   {
@@ -41,6 +96,35 @@ export const useBucket = new Elysia({ name: "middleware:bucket" }).macro({
   },
 });
 
+export const useUpload = new Elysia({ name: "middleware:upload" }).macro({
+  upload: {
+    transform: async (ctx) => {
+      ctx.params.id = validate(Id, ctx.params.id);
+      const result = await uploadStorage.get(ctx.params.id);
+      const data = result.success ? result.data : null;
+      Object.assign(ctx, {
+        bucket: data?.bucketName,
+        key: data?.key,
+        upload: data,
+      });
+    },
+
+    derive: (ctx) => {
+      const { bucket, key, upload } = ctx as typeof ctx & {
+        bucket: string | undefined;
+        key: string | undefined;
+        upload: UploadRow | null;
+      };
+
+      return {
+        bucket,
+        key,
+        upload,
+      };
+    },
+  },
+});
+
 export const useAuth = new Elysia({
   name: "middleware:auth",
 }).macro({
@@ -49,57 +133,10 @@ export const useAuth = new Elysia({
       const { credentials } = unwrap(
         resolveCredentials(headers.authorization, query),
       );
-
-      let authState: AuthState;
-      switch (credentials.kind) {
-        case "anonymous":
-          authState = { kind: "anonymous" };
-          break;
-
-        case "presign":
-          authState = { kind: "presign", params: credentials.params };
-          break;
-
-        case "bearer":
-          authState = {
-            kind: "key",
-            apiKey: unwrap(await apiKeyStorage.verify(credentials.token)).data,
-          };
-          break;
-
-        default:
-          throw new Buns3Error("INVALID_API_KEY");
-      }
-
-      return { authState };
+      return { authState: await resolveAuthState(credentials) };
     },
 
-    beforeHandle: async ({
-      authState,
-      params,
-      request,
-      bucket,
-      key,
-    }: {
-      // typed by hand: our own derive above guarantees this at runtime
-      // params re-declared optional, Elysia's Context claims it's always present
-      // but it's undefined for param-less routes.
-      authState: AuthState;
-      params?: Record<string, string>;
-      // from the bucketKey derive on data routes. validated + decoded
-      bucket?: string;
-      key?: string;
-    } & Omit<Context, "params">) => {
-      unwrap(
-        await authorize({
-          state: authState,
-          capability,
-          method: request.method,
-          bucket: bucket ?? params?.bucket,
-          key,
-        }),
-      );
-    },
+    beforeHandle: getAuthBeforeHandler(capability),
   }),
 });
 
@@ -107,7 +144,10 @@ export const useAuth = new Elysia({
 // Cloudflare and cannot be forged by a client that came through it; Traefik
 // sets X-Forwarded-For. Both are only trustworthy when the origin is reachable
 // solely through the proxy, which is the operator's call — hence a flag.
-function clientIpOf(request: Request, server: { requestIP(req: Request): { address: string } | null } | null) {
+function clientIpOf(
+  request: Request,
+  server: { requestIP(req: Request): { address: string } | null } | null,
+) {
   return (
     request.headers.get("cf-connecting-ip") ??
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
@@ -124,11 +164,12 @@ export const useLogger = (logger: Logger, opts: { clientIp: boolean }) =>
       });
     })
     .afterResponse((ctx) => {
-      const { request, set, server, authState, requestId, t0 } = ctx as typeof ctx & {
-        authState?: AuthState;
-        requestId?: string;
-        t0?: number;
-      };
+      const { request, set, server, authState, requestId, t0 } =
+        ctx as typeof ctx & {
+          authState?: AuthState;
+          requestId?: string;
+          t0?: number;
+        };
 
       const path = new URL(request.url).pathname;
       const status = set.status ?? 200;

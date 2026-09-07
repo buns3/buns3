@@ -12,6 +12,7 @@ import { config } from "$/config";
 import { logger } from "$/lib/logger";
 import { useLogger } from "./middleware";
 import type { Logger } from "pino";
+import { uploadsRoutes } from "./routes/uploads.routes";
 
 const defaultLogger = logger.child({ module: "http" });
 
@@ -60,7 +61,8 @@ export function createServer({
     .use(bucketsRoutes)
     .use(selfRoutes)
     .use(serverRoutes)
-    .use(cleanupRoutes);
+    .use(cleanupRoutes)
+    .use(uploadsRoutes);
 }
 
 export function initServer() {

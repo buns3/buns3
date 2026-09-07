@@ -5,6 +5,8 @@ import type {
   BucketWithCount,
   ObjectRow,
   ObjectSummary,
+  Upload,
+  UploadRow,
 } from "./types";
 
 export function toBucket(bucket: BucketRow): Bucket {
@@ -31,5 +33,17 @@ export function toObjectSummary(object: ObjectRow): ObjectSummary {
     contentType: object.contentType,
     createdAt: object.createdAt,
     etag: object.id,
+  };
+}
+
+export function toUpload(upload: UploadRow): Upload {
+  return {
+    uploadId: upload.id,
+    bucket: upload.bucketName,
+    key: upload.key,
+    contentType: upload.contentType,
+    size: upload.size,
+    createdAt: upload.createdAt,
+    updatedAt: upload.updatedAt,
   };
 }

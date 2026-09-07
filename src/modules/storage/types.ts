@@ -18,6 +18,10 @@ export type ObjectSummary = Omit<ObjectRow, "bucketName" | "id"> & {
 };
 
 export type UploadRow = DefaultModelRow<Contract, "Upload">;
+export type Upload = Omit<UploadRow, "id" | "bucketName"> & {
+  uploadId: string;
+  bucket: string;
+};
 
 export type Buns3FileResult<TFile> = Promise<
   Result<{ file: TFile; object: ObjectRow }>

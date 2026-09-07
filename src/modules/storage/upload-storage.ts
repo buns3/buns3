@@ -239,7 +239,10 @@ export const uploadStorage: UploadStorage = {
         }
       }
 
-      return { success: true, data: { file, object: newObject } };
+      return {
+        success: true,
+        data: { file, object: newObject },
+      };
     } catch (err) {
       log.error(
         { bucket: row.bucketName, key: row.key, err },
