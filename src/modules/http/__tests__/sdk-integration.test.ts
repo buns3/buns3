@@ -22,12 +22,7 @@ import { ERROR_CODES } from "../../../../packages/sdk/src/lib/error";
 import { createServer as createServerPlane } from "../../../../packages/sdk/src/planes/server";
 import { version as SDK_VERSION } from "../../../../packages/sdk/package.json";
 
-import {
-  API_KEY_ERROR_CODES,
-  ERROR_CODES as SERVER_ERROR_CODES,
-  PRESIGN_ERROR_CODES,
-  VALIDATION_ERROR_CODES,
-} from "$/lib/error-codes";
+import { ALL_ERROR_CODES } from "$/lib/error-codes";
 
 // The SDK talking to the REAL server, with no socket: createHttp's injected
 // fetch hands the Request straight to app.handle(). Everything else in the
@@ -58,13 +53,9 @@ describe("error codes agree across the boundary", () => {
     // The SDK cannot import the server, so it keeps a copy. This is the half
     // that notices when the server grows a code the SDK has never heard of —
     // which would surface to consumers as UNKNOWN.
-    const server = new Set([
-      ...SERVER_ERROR_CODES,
-      ...API_KEY_ERROR_CODES,
-      ...VALIDATION_ERROR_CODES,
-      ...PRESIGN_ERROR_CODES,
-    ]);
-    expect(new Set(ERROR_CODES)).toEqual(server);
+    // ALL_ERROR_CODES is compiler-checked against Buns3AnyErrorCode, so a new
+    // code FAMILY cannot slip past this the way UPLOAD_ERROR_CODES once did.
+    expect(new Set(ERROR_CODES)).toEqual(new Set(ALL_ERROR_CODES));
   });
 });
 

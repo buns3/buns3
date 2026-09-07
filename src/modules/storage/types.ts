@@ -17,6 +17,8 @@ export type ObjectSummary = Omit<ObjectRow, "bucketName" | "id"> & {
   etag: string;
 };
 
+export type UploadRow = DefaultModelRow<Contract, "Upload">;
+
 export type Buns3FileResult<TFile> = Promise<
   Result<{ file: TFile; object: ObjectRow }>
 >;
@@ -84,4 +86,26 @@ export interface Buns3BucketStorage {
   delete(bucket: string): Buns3BucketResult;
 
   list(): Buns3BucketListResult;
+}
+
+export interface UploadStorage {
+  create(
+    bucket: string,
+    key: string,
+    contentType?: string,
+  ): Promise<Result<UploadRow>>;
+
+  append(
+    id: string,
+    source: ReadableStream,
+    offset?: number,
+  ): Promise<Result<UploadRow>>;
+
+  get(id: string): Promise<Result<UploadRow>>;
+
+  complete(
+    id: string,
+  ): Promise<Result<{ file: Bun.FileBlob; object: ObjectRow }>>;
+
+  abort(id: string): Promise<Result<null>>;
 }

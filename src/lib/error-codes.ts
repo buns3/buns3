@@ -33,8 +33,35 @@ export const PRESIGN_ERROR_CODES = [
 
 export type Buns3PresignErrorCode = (typeof PRESIGN_ERROR_CODES)[number];
 
+export const UPLOAD_ERROR_CODES = [
+  "UPLOAD_NOT_FOUND",
+  "OFFSET_MISMATCH",
+] as const;
+
+export type Buns3UploadErrorCode = (typeof UPLOAD_ERROR_CODES)[number];
+
 export type Buns3AnyErrorCode =
   | Buns3ErrorCode
   | Buns3ApiKeyErrorCode
   | Buns3ValidationErrorCode
-  | Buns3PresignErrorCode;
+  | Buns3PresignErrorCode
+  | Buns3UploadErrorCode;
+
+// Every code the server can emit, in one array. `satisfies` makes a new family
+// a compile error here rather than a silent gap in the SDK drift guard, which
+// used to enumerate the families by hand and so could not see a fifth one.
+export const ALL_ERROR_CODES = [
+  ...ERROR_CODES,
+  ...API_KEY_ERROR_CODES,
+  ...VALIDATION_ERROR_CODES,
+  ...PRESIGN_ERROR_CODES,
+  ...UPLOAD_ERROR_CODES,
+] as const satisfies readonly Buns3AnyErrorCode[];
+
+// If this errors, a code family is missing from ALL_ERROR_CODES above.
+type _AllCodesCovered =
+  Exclude<Buns3AnyErrorCode, (typeof ALL_ERROR_CODES)[number]> extends never
+    ? true
+    : never;
+const _allCodesCovered: _AllCodesCovered = true;
+void _allCodesCovered;

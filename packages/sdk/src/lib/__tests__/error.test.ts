@@ -19,6 +19,8 @@ const SERVER_CODES = [
   "API_KEY_NOT_FOUND",
   "VALIDATION_ERROR",
   "PRESIGNED_EXPIRED",
+  "UPLOAD_NOT_FOUND",
+  "OFFSET_MISMATCH",
 ] as const;
 
 describe("ERROR_CODES", () => {

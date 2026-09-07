@@ -12,6 +12,8 @@ export const ERROR_CODES = [
   "API_KEY_NOT_FOUND",
   "VALIDATION_ERROR",
   "PRESIGNED_EXPIRED",
+  "UPLOAD_NOT_FOUND",
+  "OFFSET_MISMATCH",
   "UNKNOWN",
 ] as const;
 
