@@ -4,11 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>buns3 tester</title>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <!-- pin Babel 7: v8's react preset defaults to the automatic JSX runtime, which emits
-       import statements that cannot run in a classic script tag -->
-  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
   <script>
     // set theme before styles paint (no flash); stored choice wins over OS preference
     try {
@@ -41,7 +36,7 @@
     .sub { color: var(--muted); margin: 0 0 20px; }
     fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin: 0 0 12px; }
     label { display: block; color: var(--muted); font-size: 12px; margin: 8px 0 2px; }
-    input[type=text], input[type=password] { width: 100%; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; font: inherit; }
+    input[type=text], input[type=password], input[type=number] { width: 100%; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; font: inherit; }
     input:focus { outline: none; border-color: var(--accent); }
     .row { display: flex; gap: 10px; flex-wrap: wrap; } .row > div { flex: 1; min-width: 180px; }
     button { background: var(--btn); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; padding: 7px 14px; font: inherit; cursor: pointer; margin: 10px 8px 0 0; }
@@ -49,6 +44,7 @@
     button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
     button.small { padding: 3px 10px; margin: 0; font-size: 12px; }
     .check { display: flex; align-items: center; gap: 6px; margin-top: 10px; color: var(--muted); }
+    .check label { margin: 0; }
     .log { display: flex; flex-direction: column; gap: 8px; }
     .entry { border: 1px solid var(--border); border-left-width: 4px; border-radius: 6px; padding: 8px 12px; background: var(--panel); }
     .entry.ok { border-left-color: var(--ok); } .entry.err { border-left-color: var(--err); }
@@ -57,22 +53,103 @@
     .entry .meta { color: var(--muted); font-size: 12px; }
     .entry pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-all; color: var(--pre); font-size: 12px; max-height: 200px; overflow: auto; }
     .entry a { color: var(--accent); }
+    progress { width: 100%; height: 6px; margin-top: 10px; }
+    .banner { border: 1px solid var(--err); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; color: var(--err); }
   </style>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="text/babel" data-presets="react">
-    const { useState, useRef } = React;
+  <div class="wrap">
+    <div class="titlebar">
+      <h1><span>buns3</span> tester</h1>
+      <button class="small" id="theme"></button>
+    </div>
+    <p class="sub">every request below is made by <code>@buns3/sdk</code>; the log shows the wire it produced</p>
 
+    <div class="banner" id="loaderr" hidden></div>
+
+    <h2>Connection</h2>
+    <fieldset>
+      <div class="row">
+        <div><label>server</label><input type="text" id="base" /></div>
+        <div><label>bucket</label><input type="text" id="bucket" /></div>
+      </div>
+      <label>api key (stored in localStorage)</label>
+      <input type="password" id="key" placeholder="buns3_…" />
+      <div class="check">
+        <input id="anon" type="checkbox" />
+        <label for="anon">anonymous — build the client without a token, to probe public-read</label>
+      </div>
+      <button id="whoami">whoami</button>
+      <button id="serverinfo">server</button>
+    </fieldset>
+
+    <h2>Upload</h2>
+    <fieldset>
+      <label>file</label>
+      <input type="file" id="file" />
+      <div class="row">
+        <div><label>key (defaults to filename)</label><input type="text" id="objectkey" /></div>
+        <div><label>content-type (stored verbatim, no sniffing)</label><input type="text" id="ctype" placeholder="application/octet-stream" /></div>
+      </div>
+      <div class="row">
+        <div><label>chunk size (bytes, chunked upload only)</label><input type="number" id="chunk" value="8388608" min="1" /></div>
+      </div>
+      <button class="primary" id="put">put</button>
+      <button id="putchunked">putChunked</button>
+      <progress id="progress" value="0" max="1" hidden></progress>
+    </fieldset>
+
+    <h2>Probe a key</h2>
+    <fieldset>
+      <label>object key</label>
+      <input type="text" id="probekey" placeholder="README.md" />
+      <button id="get">get</button>
+      <button id="head">head</button>
+      <button id="list">list</button>
+      <button id="del">delete</button>
+    </fieldset>
+
+    <h2>Presigned</h2>
+    <fieldset>
+      <p class="sub" style="margin:0 0 4px">signed in this browser, with no round trip — the key never leaves the page</p>
+      <div class="row">
+        <div><label>method</label><input type="text" id="pmethod" value="GET" /></div>
+        <div><label>ttl (seconds)</label><input type="number" id="pttl" value="600" min="0" /></div>
+      </div>
+      <button id="presign">presign object</button>
+      <button id="follow">follow it (anonymous)</button>
+      <pre id="presigned" class="sub" style="word-break:break-all"></pre>
+    </fieldset>
+
+    <h2>Log</h2>
+    <div class="log" id="log"><p class="sub">nothing yet</p></div>
+  </div>
+
+  <script type="module">
+    // Pinned exactly: this page is served from a bucket on the same origin as
+    // your objects, so a floating version would be third-party code that can
+    // change under you.
+    import {
+      Buns3Client,
+      hashToken,
+      deriveKeyId,
+      sign,
+      buildPresignedUrl,
+    } from "https://esm.sh/@buns3/sdk@0.2.1";
+
+    const $ = (id) => document.getElementById(id);
     const store = {
       get: (k, fallback) => { try { return localStorage.getItem(k) ?? fallback; } catch { return fallback; } },
       set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
     };
 
     // When served from a bucket (/<bucket>/<key>) infer the bucket from the URL.
-    function inferBucket() {
-      const seg = location.pathname.split("/").filter(Boolean);
-      return seg.length >= 2 ? seg[0] : "testing";
+    const seg = location.pathname.split("/").filter(Boolean);
+    $("base").value = store.get("buns3.base", location.origin.startsWith("http") ? location.origin : "http://localhost:8000");
+    $("bucket").value = store.get("buns3.bucket", seg.length >= 2 ? seg[0] : "testing");
+    $("key").value = store.get("buns3.key", "");
+    for (const [id, k] of [["base", "buns3.base"], ["bucket", "buns3.bucket"], ["key", "buns3.key"]]) {
+      $(id).addEventListener("input", () => store.set(k, $(id).value));
     }
 
     const INTERESTING_HEADERS = [
@@ -80,134 +157,186 @@
       "content-disposition", "location", "www-authenticate", "content-range", "accept-ranges",
     ];
 
-    function App() {
-      const [base, setBase] = useState(store.get("buns3.base", location.origin.startsWith("http") ? location.origin : "http://localhost:8000"));
-      const [bucket, setBucket] = useState(store.get("buns3.bucket", inferBucket()));
-      const [apiKey, setApiKey] = useState(store.get("buns3.key", ""));
-      const [anonymous, setAnonymous] = useState(false);
-      const [objectKey, setObjectKey] = useState("");
-      const [contentType, setContentType] = useState("");
-      const [busy, setBusy] = useState(false);
-      const [log, setLog] = useState([]);
-      const fileRef = useRef(null);
-
-      const persist = (setter, storeKey) => (e) => { setter(e.target.value); store.set(storeKey, e.target.value); };
-
-      function objectUrl(key) {
-        return `${base.replace(/\/$/, "")}/${bucket}/${encodeURIComponent(key)}`;
+    const logEl = $("log");
+    function append({ ok, status, method, url, ms, note, headers, body }) {
+      if (logEl.firstElementChild?.tagName === "P") logEl.replaceChildren();
+      const entry = document.createElement("div");
+      entry.className = "entry " + (ok ? "ok" : "err");
+      const short = url.replace($("base").value.replace(/\/+$/, ""), "") || "/";
+      entry.innerHTML =
+        `<div class="head"><span class="status"></span><span></span><span class="meta"></span></div>`;
+      entry.querySelector(".status").textContent = status;
+      const link = document.createElement("a");
+      link.href = url; link.target = "_blank"; link.rel = "noreferrer";
+      link.textContent = decodeURIComponent(short);
+      const middle = entry.querySelector(".head span:nth-child(2)");
+      middle.append(method + " ", link);
+      entry.querySelector(".meta").textContent = `${ms}ms${note ? " · " + note : ""}`;
+      for (const text of [headers, body]) {
+        if (!text) continue;
+        const pre = document.createElement("pre");
+        pre.textContent = text;
+        entry.append(pre);
       }
-
-      function authHeaders() {
-        if (anonymous || !apiKey) return {};
-        return { Authorization: `Bearer ${apiKey}` };
-      }
-
-      async function run(method, url, init = {}, note = "") {
-        setBusy(true);
-        const started = performance.now();
-        let entry;
-        try {
-          const resp = await fetch(url, { method, ...init, headers: { ...authHeaders(), ...(init.headers ?? {}) } });
-          const ms = Math.round(performance.now() - started);
-          const headers = INTERESTING_HEADERS
-            .map((h) => [h, resp.headers.get(h)])
-            .filter(([, v]) => v !== null)
-            .map(([h, v]) => `${h}: ${v}`)
-            .join("\n");
-          let body = "";
-          if (method !== "HEAD") {
-            const text = await resp.text();
-            body = text.length > 2000 ? text.slice(0, 2000) + `\n… (${text.length} bytes total)` : text;
-          }
-          entry = { ok: resp.ok, status: `${resp.status} ${resp.statusText}`, method, url, ms, note, headers, body };
-        } catch (err) {
-          entry = { ok: false, status: "network error", method, url, ms: Math.round(performance.now() - started), note, headers: "", body: String(err) };
-        }
-        setLog((l) => [{ id: Date.now() + Math.random(), anon: anonymous || !apiKey, ...entry }, ...l]);
-        setBusy(false);
-      }
-
-      async function upload() {
-        const file = fileRef.current?.files?.[0];
-        if (!file) return;
-        const key = objectKey || file.name;
-        const type = contentType || file.type || "application/octet-stream";
-        await run("PUT", objectUrl(key), { body: file, headers: { "Content-Type": type } }, `upload ${file.name} as "${key}" (${type})`);
-      }
-
-      const keyOrFile = () => objectKey || fileRef.current?.files?.[0]?.name || "";
-
-      const [theme, setTheme] = useState(document.documentElement.dataset.theme);
-      function toggleTheme() {
-        const next = theme === "light" ? "dark" : "light";
-        document.documentElement.dataset.theme = next;
-        try { localStorage.setItem("buns3.theme", next); } catch {}
-        setTheme(next);
-      }
-
-      return (
-        <div className="wrap">
-          <div className="titlebar">
-            <h1><span>buns3</span> tester</h1>
-            <button className="small" onClick={toggleTheme}>{theme === "light" ? "☾ dark" : "☀ light"}</button>
-          </div>
-          <p className="sub">requests go to the server below; auth optional — uncheck nothing and clear the key to probe public-read</p>
-
-          <h2>Connection</h2>
-          <fieldset>
-            <div className="row">
-              <div><label>server</label><input type="text" value={base} onChange={persist(setBase, "buns3.base")} /></div>
-              <div><label>bucket</label><input type="text" value={bucket} onChange={persist(setBucket, "buns3.bucket")} /></div>
-            </div>
-            <label>api key (stored in localStorage)</label>
-            <input type="password" value={apiKey} onChange={persist(setApiKey, "buns3.key")} placeholder="buns3_…" />
-            <div className="check">
-              <input id="anon" type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
-              <label htmlFor="anon" style={{ margin: 0 }}>anonymous — omit Authorization header even if a key is set</label>
-            </div>
-          </fieldset>
-
-          <h2>Upload</h2>
-          <fieldset>
-            <label>file</label>
-            <input type="file" ref={fileRef} onChange={(e) => { const f = e.target.files?.[0]; if (f) { setObjectKey(f.name); setContentType(f.type || ""); } }} />
-            <div className="row">
-              <div><label>key (defaults to filename)</label><input type="text" value={objectKey} onChange={(e) => setObjectKey(e.target.value)} /></div>
-              <div><label>content-type (stored verbatim, no sniffing)</label><input type="text" value={contentType} onChange={(e) => setContentType(e.target.value)} placeholder="application/octet-stream" /></div>
-            </div>
-            <button className="primary" disabled={busy} onClick={upload}>PUT</button>
-          </fieldset>
-
-          <h2>Probe a key</h2>
-          <fieldset>
-            <label>object key</label>
-            <input type="text" value={objectKey} onChange={(e) => setObjectKey(e.target.value)} placeholder="README.md" />
-            <button disabled={busy || !keyOrFile()} onClick={() => run("GET", objectUrl(keyOrFile()))}>GET</button>
-            <button disabled={busy || !keyOrFile()} onClick={() => run("HEAD", objectUrl(keyOrFile()))}>HEAD</button>
-            <button disabled={busy || !keyOrFile()} onClick={() => { if (confirm(`DELETE ${keyOrFile()}?`)) run("DELETE", objectUrl(keyOrFile())); }}>DELETE</button>
-            <button disabled={busy} onClick={() => run("GET", `${base.replace(/\/$/, "")}/_self`)}>whoami</button>
-          </fieldset>
-
-          <h2>Log</h2>
-          <div className="log">
-            {log.length === 0 && <p className="sub">nothing yet</p>}
-            {log.map((e) => (
-              <div key={e.id} className={"entry " + (e.ok ? "ok" : "err")}>
-                <div className="head">
-                  <span className="status">{e.status}</span>
-                  <span>{e.method} <a href={e.url} target="_blank" rel="noreferrer">{decodeURIComponent(e.url.replace(base, ""))}</a></span>
-                  <span className="meta">{e.ms}ms{e.anon ? " · anon" : ""}{e.note ? " · " + e.note : ""}</span>
-                </div>
-                {e.headers && <pre>{e.headers}</pre>}
-                {e.body && <pre>{e.body}</pre>}
-              </div>
-            ))}
-          </div>
-        </div>
-      );
+      logEl.prepend(entry);
     }
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    // The SDK's fetch seam: every request it makes passes through here, so the
+    // log shows what the SDK actually sent rather than what this page intended.
+    async function loggedFetch(input, init = {}) {
+      const url = typeof input === "string" ? input : input.url;
+      const method = init.method ?? "GET";
+      const started = performance.now();
+      try {
+        const res = await fetch(input, init);
+        const ms = Math.round(performance.now() - started);
+        const headers = INTERESTING_HEADERS
+          .map((h) => [h, res.headers.get(h)])
+          .filter(([, v]) => v !== null)
+          .map(([h, v]) => `${h}: ${v}`)
+          .join("\n");
+
+        // Read the body from a clone so the SDK still gets an unconsumed one.
+        let body = "";
+        if (method !== "HEAD") {
+          const text = await res.clone().text().catch(() => "");
+          body = text.length > 2000 ? `${text.slice(0, 2000)}\n… (${text.length} bytes total)` : text;
+        }
+        append({ ok: res.ok, status: `${res.status} ${res.statusText}`, method, url, ms, headers, body });
+        return res;
+      } catch (err) {
+        append({
+          ok: false, status: "network error", method, url,
+          ms: Math.round(performance.now() - started), headers: "", body: String(err),
+        });
+        throw err;
+      }
+    }
+
+    const client = () =>
+      new Buns3Client($("base").value, {
+        token: $("anon").checked ? undefined : $("key").value || undefined,
+        fetch: loggedFetch,
+      });
+
+    const bucket = () => $("bucket").value;
+    const file = () => $("file").files?.[0] ?? null;
+    const keyOf = () => $("objectkey").value || file()?.name || "";
+    const probeKey = () => $("probekey").value || keyOf();
+
+    // A failure that never reached the wire (a refused create, say) has no log
+    // entry of its own, so surface it.
+    function note(result, label) {
+      if (!result.success) {
+        append({ ok: false, status: `${result.status} ${result.code}`, method: "", url: label, ms: 0, headers: "", body: result.detail ?? "" });
+      }
+      return result;
+    }
+
+    async function busy(button, fn) {
+      const buttons = document.querySelectorAll("button");
+      buttons.forEach((b) => (b.disabled = true));
+      try { await fn(); } finally { buttons.forEach((b) => (b.disabled = false)); }
+    }
+
+    $("file").addEventListener("change", () => {
+      const f = file();
+      if (!f) return;
+      $("objectkey").value = f.name;
+      $("ctype").value = f.type || "";
+      $("probekey").value = f.name;
+    });
+
+    $("put").addEventListener("click", () => busy($("put"), async () => {
+      const f = file();
+      if (!f) return;
+      note(await client().objects.put(bucket(), keyOf(), f, { contentType: $("ctype").value || undefined }), "put");
+    }));
+
+    $("putchunked").addEventListener("click", () => busy($("putchunked"), async () => {
+      const f = file();
+      if (!f) return;
+      const bar = $("progress");
+      bar.hidden = false;
+      bar.value = 0;
+      try {
+        note(
+          await client().objects.putChunked(bucket(), keyOf(), f, {
+            contentType: $("ctype").value || undefined,
+            chunkSize: Number($("chunk").value) || undefined,
+            onProgress: (uploaded, total) => { bar.value = total === 0 ? 1 : uploaded / total; },
+          }),
+          "putChunked",
+        );
+      } finally {
+        setTimeout(() => { bar.hidden = true; }, 1500);
+      }
+    }));
+
+    $("get").addEventListener("click", () => busy($("get"), async () => {
+      note(await client().objects.get(bucket(), probeKey()), "get");
+    }));
+    $("head").addEventListener("click", () => busy($("head"), async () => {
+      note(await client().objects.head(bucket(), probeKey()), "head");
+    }));
+    $("list").addEventListener("click", () => busy($("list"), async () => {
+      note(await client().objects.list(bucket()), "list");
+    }));
+    $("del").addEventListener("click", () => busy($("del"), async () => {
+      if (!confirm(`delete ${probeKey()}?`)) return;
+      note(await client().objects.delete(bucket(), probeKey()), "delete");
+    }));
+    $("whoami").addEventListener("click", () => busy($("whoami"), async () => {
+      note(await client().self.whoami(), "whoami");
+    }));
+    $("serverinfo").addEventListener("click", () => busy($("serverinfo"), async () => {
+      note(await client().server.get(), "server");
+    }));
+
+    // Signed here, in the browser, from the key alone: no request, so nothing
+    // appears in the log until the URL is followed.
+    $("presign").addEventListener("click", () => busy($("presign"), async () => {
+      const token = $("key").value;
+      if (!token) { $("presigned").textContent = "needs an api key"; return; }
+      const tokenHash = await hashToken(token);
+      const expires = Math.floor(Date.now() / 1000) + (Number($("pttl").value) || 600);
+      const url = buildPresignedUrl($("base").value.replace(/\/+$/, ""), bucket(), probeKey(), {
+        keyId: await deriveKeyId(tokenHash),
+        expires,
+        sig: await sign({ tokenHash, method: $("pmethod").value.toUpperCase(), bucket: bucket(), key: probeKey(), expires }),
+      });
+      $("presigned").textContent = url;
+    }));
+
+    $("follow").addEventListener("click", () => busy($("follow"), async () => {
+      const url = $("presigned").textContent;
+      if (!url.startsWith("http")) return;
+      const anonymous = new Buns3Client($("base").value, { fetch: loggedFetch });
+      note(await anonymous.presigned.get(url), "follow presigned");
+    }));
+
+    const themeBtn = $("theme");
+    function paintTheme() {
+      themeBtn.textContent = document.documentElement.dataset.theme === "light" ? "☾ dark" : "☀ light";
+    }
+    themeBtn.addEventListener("click", () => {
+      const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+      document.documentElement.dataset.theme = next;
+      try { localStorage.setItem("buns3.theme", next); } catch {}
+      paintTheme();
+    });
+    paintTheme();
+  </script>
+  <script type="module">
+    // A module that fails to import is silent; say so rather than showing a
+    // page whose buttons do nothing.
+    setTimeout(() => {
+      if (!document.getElementById("theme").textContent) {
+        const b = document.getElementById("loaderr");
+        b.hidden = false;
+        b.textContent = "could not load @buns3/sdk from esm.sh — check the network tab";
+      }
+    }, 4000);
   </script>
 </body>
 </html>
