@@ -168,15 +168,22 @@ export const useLogger = (logger: Logger, opts: { clientIp: boolean }) =>
       });
     })
     .afterResponse((ctx) => {
-      const { request, set, server, authState, requestId, t0 } =
+      const { request, set, server, authState, requestId, t0, responseValue } =
         ctx as typeof ctx & {
           authState?: AuthState;
           requestId?: string;
           t0?: number;
+          responseValue?: unknown;
         };
 
       const path = new URL(request.url).pathname;
-      const status = set.status ?? 200;
+      // A handler that returns a raw Response never touches `set.status`, so
+      // the old `set.status ?? 200` logged 200 for every one of them — the
+      // object HEAD route was right by luck, and a CORS preflight's 204 was
+      // simply wrong. `responseValue` is the returned value (2.0 renamed it
+      // from `response`), and is a Response only in exactly that case.
+      const status =
+        responseValue instanceof Response ? responseValue.status : (set.status ?? 200);
       // The healthcheck polls every 10s; a healthy answer is not worth an info line, a 503 is.
       const level = path === "/_health" && status === 200 ? "debug" : "info";
 

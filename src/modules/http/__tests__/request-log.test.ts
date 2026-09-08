@@ -150,4 +150,48 @@ describe("request log", () => {
     // The 422 is thrown in a transform, before any derive: the id must still be there.
     for (const line of requests()) expect(typeof line.requestId).toBe("string");
   });
+
+  test("the logged status is the one that was sent, even from a raw Response", async () => {
+    // A handler returning `new Response(...)` never assigns `set.status`, so a
+    // logger reading only that reports 200 for every such route. The object
+    // HEAD route was right by accident; a CORS preflight's 204 was not.
+    await seedBucket("pub", { publicRead: true });
+    await seedObject("pub", "a.txt");
+
+    const head = await app.handle(
+      new Request("http://buns3.test/pub/a.txt", { method: "HEAD" }),
+    );
+    expect(head.status).toBe(200);
+    expect(requests().at(-1)).toMatchObject({ method: "HEAD", status: 200 });
+
+    // The live case: browsers ask for this on every page view of a tester page.
+    const favicon = await get("http://buns3.test/favicon.ico");
+    expect(favicon.status).toBe(204);
+    expect(requests().at(-1)).toMatchObject({ path: "/favicon.ico", status: 204 });
+  });
+
+  test("a preflight is logged, but its status is a KNOWN GAP", async () => {
+    // The plugin answers preflights from its `request` hook, the earliest
+    // phase, so afterResponse sees no handler return value and an untouched
+    // `set.status`. Probed: the context carries request, path, set, server —
+    // and nothing that names the 204. The line is still worth having, since a
+    // CORS failure in production is debugged from exactly here, but the status
+    // reads 200 and the id and duration are absent because no transform ran.
+    const preflight = createServer({ logger, corsOrigins: ["https://app.example.com"] });
+    const res = await preflight.handle(
+      new Request("http://buns3.test/pub/a.txt", {
+        method: "OPTIONS",
+        headers: {
+          origin: "https://app.example.com",
+          "access-control-request-method": "GET",
+        },
+      }),
+    );
+    expect(res.status).toBe(204);
+
+    const line = requests().at(-1)!;
+    expect(line).toMatchObject({ method: "OPTIONS", path: "/pub/a.txt", status: 200 });
+    expect(line.requestId).toBeUndefined();
+    expect(line.ms).toBeUndefined();
+  });
 });
