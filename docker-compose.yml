@@ -18,6 +18,17 @@ services:
       target: runtime
     environment:
       - BASE_URL=${BASE_URL:?set BASE_URL}
+      - CORS_ORIGINS
+      - PORT
+      - OPENAPI
+      - LOG_LEVEL
+      - LOG_CLIENT_IP
+      - CLEANUP_ENABLED
+      - CLEANUP_DRY_RUN
+      - CLEANUP_RUN_ON_STARTUP
+      - CLEANUP_OLDER_THAN_MS
+      - CLEANUP_UPLOAD_OLDER_THAN_MS
+      - CLEANUP_INTERVAL_MS
     volumes:
       - buns3-data:/data
     depends_on:
