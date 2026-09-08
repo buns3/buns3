@@ -133,6 +133,72 @@ describe("cleanup timings", () => {
   });
 });
 
+describe("CORS_ORIGINS", () => {
+  // The riskiest knob in the file: nothing downstream can catch a wrong value,
+  // because every server test is same-origin. Boot is the only gate.
+
+  test("unset means CORS is off, not an empty allowlist", () => {
+    // The composition root branches on the key being absent, so "off" has to be
+    // absence — an empty array would register the plugin and answer preflights.
+    expect(ok(valid)).not.toHaveProperty("CORS_ORIGINS");
+  });
+
+  test("an empty string is unset too, so a bare ${CORS_ORIGINS} in compose is off", () => {
+    expect(ok({ ...valid, CORS_ORIGINS: "" })).not.toHaveProperty("CORS_ORIGINS");
+  });
+
+  test("a list is stored as strings, because the whole config is logged at startup", () => {
+    // Compiled patterns would print as `[{}]` in the startup line, which is the
+    // one place an operator can read back what production actually loaded.
+    const out = ok({ ...valid, CORS_ORIGINS: "https://a.example,http://localhost:*" });
+    expect(out.CORS_ORIGINS).toEqual(["https://a.example", "http://localhost:*"]);
+    expect(JSON.stringify(out.CORS_ORIGINS)).toBe('["https://a.example","http://localhost:*"]');
+  });
+
+  test("entries are trimmed and deduped", () => {
+    const out = ok({ ...valid, CORS_ORIGINS: " https://a.example , https://a.example ,https://b.example" });
+    expect(out.CORS_ORIGINS).toEqual(["https://a.example", "https://b.example"]);
+  });
+
+  test('"*" alone means any origin', () => {
+    expect(ok({ ...valid, CORS_ORIGINS: "*" }).CORS_ORIGINS).toBe("*");
+  });
+
+  test('"*" alongside named origins is refused, not silently widened', () => {
+    // "these three, plus anything" is just "anything" wearing a disguise, and
+    // the named entries would read as a restriction that is not there.
+    expect(fails({ ...valid, CORS_ORIGINS: "*,https://a.example" })).toContain("CORS_ORIGINS");
+  });
+
+  test("a list of separators alone is a boot error, not an empty allowlist", () => {
+    expect(fails({ ...valid, CORS_ORIGINS: " , " })).toContain("CORS_ORIGINS");
+  });
+
+  test("only commas separate — spaces do not", () => {
+    expect(fails({ ...valid, CORS_ORIGINS: "https://a.example https://b.example" })).toContain(
+      "CORS_ORIGINS",
+    );
+  });
+
+  test.each(["example.com", "https://example.com/", "*://example.com", "https://foo*.example.com"])(
+    "rejects %s",
+    (v) => {
+      expect(fails({ ...valid, CORS_ORIGINS: v })).toContain("CORS_ORIGINS");
+    },
+  );
+
+  test("every bad entry is named, not just the first", () => {
+    // An operator fixing a list one boot at a time is an operator who gives up.
+    const summary = fails({ ...valid, CORS_ORIGINS: "example.com,ftp://x.com,https://ok.example" });
+    expect(summary).toContain("example.com");
+    expect(summary).toContain("ftp://x.com");
+  });
+
+  test("one bad entry fails the whole list — no partial allowlist", () => {
+    expect(fails({ ...valid, CORS_ORIGINS: "https://ok.example,nope" })).toContain("CORS_ORIGINS");
+  });
+});
+
 describe("reporting", () => {
   test("every problem is listed at once, not just the first", () => {
     const summary = fails({ PORT: "0", OPENAPI: "true" });

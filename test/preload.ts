@@ -48,6 +48,10 @@ process.env.DATA_PATH = dataDir;
 process.env.BASE_URL = "http://buns3.test";
 // Bun auto-loads .env into tests; a developer's OPENAPI=1 must not leak in.
 process.env.OPENAPI = "0";
+// Same leak, second knob: CORS_ORIGINS decides the Vary header, which is
+// computed once at module load, so a developer's .env silently rewrites what
+// every object response asserts. Tests run with CORS off.
+delete process.env.CORS_ORIGINS;
 // Route every log line, from every module, into lib/logger's in-memory sink.
 process.env.LOG_CAPTURE = "1";
 
