@@ -54,6 +54,36 @@ have no anonymous path.
 `baseUrl` must be an origin. Presigned URLs are assembled by concatenation, so
 a base path would not survive.
 
+## From a browser
+
+If your page is served from a different origin than `baseUrl`, the server has
+to allow that origin or the browser will block every call. Nothing in this
+package can work around it: the request reaches the server and succeeds, and
+the browser then refuses to hand you the response. A presigned URL is no
+exception, valid signature and all.
+
+The server takes a comma-separated allowlist:
+
+```bash
+CORS_ORIGINS=https://app.example.com,http://localhost:*
+```
+
+`*` stands for exactly one whole component and never crosses a separator, so
+`https://*.example.com` covers `https://app.example.com` but not
+`https://deep.app.example.com`. A wildcard port does not cover an absent one,
+because browsers omit the default port from `Origin`. When the variable is
+unset the server sends no CORS headers at all, which is the state you are in
+if calls work from Node and fail from a page.
+
+Two symptoms worth recognising. A write that succeeds while `location` comes
+back `null` means the server is not exposing `Location`. And an `OPTIONS` line
+in the server log with no matching `GET` or `PUT` after it means the preflight
+was refused and the browser never sent the real request, which is what happens
+to any call carrying an `Authorization` header.
+
+Same-origin pages need none of this, so a page served by buns3 itself, from a
+bucket, already works.
+
 ## Objects
 
 ```ts
