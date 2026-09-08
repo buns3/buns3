@@ -486,7 +486,7 @@ this one) are claims about it.
 ## Development
 
 ```bash
-bun test              # 779 tests, ~6s, server and SDK
+bun test              # 799 tests, ~6s, server and SDK
 bun x tsc --noEmit    # Bun does not type-check; this does
 bun run dev           # watch mode on :8000
 ```
