@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "license": "MIT",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "scripts": {
     "dev": "bun --watch --no-clear-screen ./src | bun x pino-pretty",
     "prisma:studio": "cd .. && bunx prisma@7 studio --url \"file://$SQLITE_PATH\""

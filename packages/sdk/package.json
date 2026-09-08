@@ -1,6 +1,6 @@
 {
   "name": "@buns3/sdk",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "module": "src/index.ts",
   "license": "MIT",
   "type": "module",
