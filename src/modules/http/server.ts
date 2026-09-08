@@ -13,16 +13,37 @@ import { logger } from "$/lib/logger";
 import { useLogger } from "./middleware";
 import type { Logger } from "pino";
 import { uploadsRoutes } from "./routes/uploads.routes";
+import { cors } from "@elysia/cors";
+import { corsOrigin } from "$/lib/cors";
 
 const defaultLogger = logger.child({ module: "http" });
 
 export function createServer({
   logger = defaultLogger,
   clientIp = config.LOG_CLIENT_IP,
-}: { logger?: Logger; clientIp?: boolean } = {}) {
+  corsOrigins = config.CORS_ORIGINS,
+}: {
+  logger?: Logger;
+  clientIp?: boolean;
+  corsOrigins?: "*" | string[];
+} = {}) {
   return new Elysia({
     serve: { maxRequestBodySize: 5 * 1024 ** 3 },
   })
+    .use([
+      ...(corsOrigins
+        ? [
+            cors({
+              origin: corsOrigin(corsOrigins),
+              allowedHeaders:
+                "Authorization, Content-Type, If-None-Match, Range",
+              exposeHeaders: "ETag, Location, Content-Range",
+              maxAge: 600,
+              credentials: false,
+            }),
+          ]
+        : []),
+    ])
     .use(useErrorHandler)
     .use(useLogger(logger, { clientIp }))
     .use(
@@ -56,7 +77,7 @@ export function createServer({
       }),
     )
 
-    .use(objectsRoutes)
+    .use(objectsRoutes(corsOrigins))
     .use(apiKeyRoutes)
     .use(bucketsRoutes)
     .use(selfRoutes)

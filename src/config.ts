@@ -1,5 +1,6 @@
 import { type } from "arktype";
 import type { LevelWithSilent } from "pino";
+import { globToRegExp } from "./lib/cors";
 
 export const LOG_LEVELS = [
   "fatal",
@@ -45,7 +46,36 @@ const Cleanup = type({
     .default("900000"), // default 15 minutes
 });
 
-export const Config = type.merge(Base, Cleanup).onUndeclaredKey("delete");
+const Origins = type("string").pipe((raw, ctx) => {
+  const entries = [
+    ...new Set(
+      raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (entries.length === 0) return ctx.error("at least one origin");
+  if (entries.includes("*")) {
+    if (entries.length > 1)
+      return ctx.error('"*" to be the only entry when present');
+    return "*" as const;
+  }
+  const out: string[] = [];
+  for (const e of entries) {
+    const re = globToRegExp(e);
+    // the string, not the pattern
+    if (re) out.push(e);
+    else ctx.error(`a scheme+host origin glob; "${e}" is not`);
+  }
+  return out;
+});
+
+const Cors = type({
+  "CORS_ORIGINS?": Origins,
+});
+
+export const Config = type.merge(Base, Cleanup, Cors).onUndeclaredKey("delete");
 
 export type Config = typeof Config.infer;
 
