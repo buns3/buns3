@@ -77,9 +77,42 @@ origin, no path or trailing slash, because presigned URLs are built from it.
 | `CLEANUP_OLDER_THAN_MS` | `3600000` | The age gate for temp files and orphaned blobs. Floor 60000: a small gate races live uploads. |
 | `CLEANUP_UPLOAD_OLDER_THAN_MS` | `86400000` | How long an untouched upload session survives. Floor 3600000. |
 | `CLEANUP_INTERVAL_MS` | `900000` | Sweep interval. Floor 60000. |
+| `CORS_ORIGINS` | unset | Comma-separated origin patterns. Unset means no CORS headers at all and preflights 404. See below. |
 
 Flags are exactly `0` or `1`; anything else is a startup error rather than a
 guess.
+
+### Browser origins
+
+A browser on a different origin cannot call the API unless you list its origin
+in `CORS_ORIGINS`. Presigned URLs are the common case: the URL is valid, but
+without CORS the browser refuses to hand the response to your JavaScript.
+
+```bash
+CORS_ORIGINS=https://app.example.com,https://*.preview.example.com,http://localhost:*
+```
+
+Each entry is a full origin with its scheme. `*` stands for exactly one whole
+component and never crosses a separator, so `https://*.example.com` matches
+`https://app.example.com` but not `https://evil-example.com`, not
+`https://deep.app.example.com`, and not `http://app.example.com`. A partial
+wildcard like `https://foo*.example.com` is refused rather than interpreted.
+
+Two rules worth knowing before you write the list:
+
+- **A wildcard port does not cover an absent one.** Browsers omit the default
+  port from `Origin`, so `http://localhost:*` matches `http://localhost:5173`
+  but not `http://localhost`. List both if you need both.
+- **`*` on its own means any origin, and cannot be combined.** A list reading
+  "these three, plus anything" is just "anything", so it is a startup error.
+
+Anything that is not a plain origin is refused at startup with every bad entry
+named: bare hosts, trailing slashes, paths, wildcard schemes, uppercase hosts,
+and the literal `null` that sandboxed frames send.
+
+`Access-Control-Allow-Credentials` is never sent. buns3 authenticates with an
+`Authorization` header rather than cookies, so credentialed CORS buys nothing
+and would forbid `*`.
 
 Logs are JSON lines on stdout, one per request (`requestId`, method, path,
 status, duration, auth kind) plus operational events, each tagged with its
@@ -422,6 +455,29 @@ exception. Tokens and the `Authorization` header are never logged; a 500
 carries a `requestId` that matches its request line, so the stack trace and
 the request can be joined without either being in the response.
 
+**A CORS wildcard is one whole component.** `*` in `CORS_ORIGINS` stands for
+exactly one label or one port and never crosses a dot, so
+`https://*.example.com` cannot be talked into matching `https://evil-example.com`
+or `https://deep.app.example.com`. Partial wildcards are refused at startup
+rather than interpreted. The rule is stricter than it needs to be on purpose:
+a too-permissive pattern is a silent grant to an attacker's origin, while a
+too-restrictive one is a browser error the operator can read in seconds, and
+no server-side test can tell the difference because every one of them is
+same-origin.
+
+**A response that echoes an origin says it varies by one.** Object responses
+send `Vary: Authorization, Origin` whenever CORS is configured, and drop
+`Origin` when it is not. Without that, an anonymous read of a public bucket —
+which is `public, max-age=60` and therefore stored at the edge — would let a
+CDN hand one site's `Access-Control-Allow-Origin` to every other site. Adding
+`Origin` unconditionally was rejected too: with CORS off nothing varies by it,
+and the header would split every cache entry for nothing.
+
+**`Access-Control-Allow-Credentials` is never sent.** buns3 authenticates with
+an `Authorization` header rather than cookies, so credentialed CORS grants
+nothing and would make `*` illegal. Preflights are answered before auth runs,
+because a browser cannot attach the header until the preflight succeeds.
+
 **One bug, one lesson.** Every gotcha this project has hit — beta framework
 lies, ORM codec surprises, timezone skews — is written into `CLAUDE.md` with
 the probe that proved it. The wire is the source of truth; the docs (including
@@ -430,7 +486,7 @@ this one) are claims about it.
 ## Development
 
 ```bash
-bun test              # 685 tests, ~6s, server and SDK
+bun test              # 777 tests, ~6s, server and SDK
 bun x tsc --noEmit    # Bun does not type-check; this does
 bun run dev           # watch mode on :8000
 ```
